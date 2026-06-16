@@ -1,0 +1,93 @@
+@use "../public/assets/scss/tailwind/tailwind";
+@forward "../public/assets/css/style.css";
+@forward "../public/assets/css/icons.css";
+
+//Packages css
+@forward "../node_modules/simplebar-react/dist/simplebar.min.css";
+@forward "../node_modules/filepond/dist/filepond.min.css"; //file pond css
+@forward "../node_modules/filepond-plugin-image-preview/dist/filepond-plugin-image-preview.css"; //dependencies plugin css for react file pond package
+@forward "../node_modules/shepherd.js/dist/css/shepherd.css"; //tour css
+@forward "../node_modules/react-phone-number-input/style.css";
+@forward "../node_modules/swiper/swiper-bundle.css";
+@forward "../node_modules/gridjs/dist/theme/mermaid.css";
+@forward "../node_modules/react-data-table-component-extensions/dist/index.css";
+@forward "../node_modules/plyr-react/plyr.css";
+@forward "../node_modules/yet-another-react-lightbox/dist/plugins/thumbnails/thumbnails.css";
+@forward "../node_modules/yet-another-react-lightbox/dist/styles.css";
+@forward "../node_modules/react-datepicker/dist/react-datepicker.css";
+@forward "../node_modules/leaflet/dist/leaflet.css";
+@forward "../node_modules/suneditor/dist/css/suneditor.min.css";
+@forward "../node_modules/react-listbox/dist/react-listbox.css";
+@forward "../node_modules/react-country-state-city/dist/react-country-state-city.css";
+@forward "../node_modules/react-autocomplete-input/dist/bundle.css";
+
+
+.profile-timeline .profile-activity-media img {
+    @apply w-[4rem] h-[3rem] #{!important};
+}
+
+.top-nft img {
+    @apply w-[2.5rem] h-[2.5rem] #{!important};
+}
+.w-\[88\%\] {
+    width: 88%;
+}
+//.swiper-slide {
+//    [data-nimg="fill"] {
+//        width: 100% !important;
+//    }
+//}
+.image-container {
+    img {
+      @apply w-full h-auto #{!important};
+    }
+  }
+
+  .header-autoComplete {
+    @apply h-[35px] #{!important};
+  }
+
+
+
+
+
+  
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+@keyframes pulse-ring {
+  0%   { transform: translate(-50%, -50%) scale(0.8); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(1.1); opacity: 0; }
+}
+
+@layer utilities {
+  .animate-ticker  { animation: ticker 120s linear infinite; }
+  .animate-ticker:hover { animation-play-state: paused; }
+  .animate-blink   { animation: blink 2s ease infinite; }
+  .pulse-ring-1    { animation: pulse-ring 3s ease-out infinite; }
+  .pulse-ring-2    { animation: pulse-ring 3s ease-out infinite 0.6s; }
+  .pulse-ring-3    { animation: pulse-ring 3s ease-out infinite 1.2s; }
+  .pulse-ring-4    { animation: pulse-ring 3s ease-out infinite 1.8s; }
+}
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  background: #1d9e75;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-weight: 700;
+  text-decoration: none;
+  z-index: 9999;
+  transition: top 0.2s;
+}
+.skip-link:focus { top: 8px; }

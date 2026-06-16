@@ -1,0 +1,55 @@
+/* Start:: Breadcrumb Styles */
+
+
+.breadcrumb {
+  @apply mb-2;
+  .breadcrumb-item {
+    a {
+      @apply text-primary #{!important};
+    }
+
+    &.active {
+      @apply text-defaulttextcolor font-semibold;
+    }
+  }
+}
+.breadcrumb-item+.breadcrumb-item {
+  @apply ps-2;
+}
+.breadcrumb-item+.breadcrumb-item{
+  @apply before:content-["\ea65"] before:font-tabler before:text-textmuted before:dark:text-textmuted/50 before:me-2 before:inline-flex rtl:before:rotate-180;
+}
+.breadcrumb-example1 {
+  .breadcrumb-item+.breadcrumb-item{
+    @apply before:content-[''] before:text-textmuted before:dark:text-textmuted/50 before:me-0 before:inline-flex #{!important};
+  }
+}
+.breadcrumb-example2 {
+  .breadcrumb-item+.breadcrumb-item{
+    @apply before:content-["~"] before:text-textmuted before:dark:text-textmuted/50 before:inline-flex;
+  }
+}
+.breadcrumb-style1 {
+  .breadcrumb-item+.breadcrumb-item::before {
+    @apply text-textmuted dark:text-textmuted/50 content-["->"] before:inline-flex;
+  }
+}
+.breadcrumb-style2 {
+  .breadcrumb-item+.breadcrumb-item::before {
+    @apply text-textmuted dark:text-textmuted/50 content-[''] before:inline-flex;
+  }
+}
+.breadcrumb-style3{
+  .breadcrumb-item+.breadcrumb-item::before {
+    @apply text-textmuted dark:text-textmuted/50 content-[''] before:inline-flex;
+  }
+}
+.embedded-breadcrumb:before {
+  @apply opacity-[0.7] before:content-[''];
+}
+.dark {
+  .embedded-breadcrumb:before {
+    @apply invert-[1];
+  }
+}
+/* End:: Breadcrumb Styles */

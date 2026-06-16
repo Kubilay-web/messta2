@@ -1,0 +1,58 @@
+// app/api/onesocial/friends/sent-requests/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import db from '@/app/lib/db'
+import { validateRequest } from '@/app/auth'
+
+
+export async function GET(request: NextRequest) {
+  try {
+    const {user} = await validateRequest()
+    
+    if (!user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // User'ın gönderdiği pending friend requests
+    const requests = await db.friendRequest.findMany({
+      where: {
+        userId: user.id,
+        status: 'pending'
+      },
+      include: {
+        friend: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+            bio: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      requests: requests.map(req => ({
+        id: req.id,
+        userId: req.userId,
+        friendId: req.friendId,
+        user: req.friend,
+        status: req.status,
+        createdAt: req.createdAt
+      }))
+    })
+  } catch (error) {
+    console.error('Error fetching sent requests:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}

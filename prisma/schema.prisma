@@ -1,0 +1,6215 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+  SELLER
+  WRITER
+}
+
+enum RoleShop {
+  USER
+  ADMIN
+  SELLER
+}
+
+enum RoleJob {
+  CANDIDATE
+  ADMIN
+  COMPANY
+}
+
+enum RoleRealEstate {
+  USER
+  ADMIN
+}
+
+//Project and Medical Apps
+
+enum RoleProject {
+  USER
+  ADMIN
+  CLIENT
+  MEMBER
+}
+
+//
+
+model User {
+  id String @id @default(cuid()) @map("_id")
+
+  //Project Management
+
+  username  String?
+  name      String?
+  firstName String?
+  lastName  String?
+
+  phone           String?
+  localCurrency   String? @default("UGX")
+  defaultCurrency String? @default("UGX")
+
+  emailVerified DateTime?
+  userLogo      String?
+  country       String?
+
+  plain              String?
+  companyName        String?
+  companyDescription String?
+  userId             String?
+  status             Boolean           @default(true)
+  accounts           AccountProject[]
+  guestProjects      GuestProject[]
+  projects           Project[]
+  invoices           Invoice[]
+  commentsProject    ProjectComment[]
+  portfolioItems     PortfolioItem[]
+  paymentsProject    Payment[]
+  modules            Module[]
+  folders            Folder[]
+  portfolioProfile   PortfolioProfile?
+  subscribersProject Subscriber[]
+  isVerfied          Boolean           @default(false)
+  token              Int?
+
+  //
+
+  // Invoice Generator Start
+
+  jobTitle String?
+
+  account AccountInvoice[]
+
+  isVerified Boolean @default(false)
+
+  // Subscription related fields
+  stripeCustomerId String?
+  subscription     SubscriptionInvoice?
+  payment          PaymentInvoice[]
+  invoiceCount     Int                  @default(0)
+
+  // Invoice tracking fields (modified)
+  dailyInvoicesCreated Int            @default(0) // Count for current day
+  lastInvoiceDate      DateTime? // Last invoice creation date (for daily reset)
+  totalInvoicesCreated Int            @default(0) // Lifetime count
+  // Invoice SaaS relationships
+  brand                Brand?
+  clients              Client[]
+  invoice              InvoiceModel[]
+
+  // Invoice Generator Finish
+
+  //School Manage Start
+
+  roleschool UserRoleSchool?
+
+  // School-related fields
+  schoolId   String?
+  schoolName String?
+  school     School? @relation(fields: [schoolId], references: [id])
+
+  // One-to-One relationships
+  teacher Teacher?
+  student Student?
+  parent  Parent?
+
+  refreshTokens RefreshToken[]
+
+  //School Manage Finish
+
+  // Real Estate ERP
+
+  roleGayrimenkul UserRoleGayrimenkul?
+  agencyId        String?
+  agencyName      String?
+  agency          Agency?              @relation(fields: [agencyId], references: [id])
+  agent           Agent?
+  propertyClient  PropertyClient?
+  crmLeads        Lead[] // Pazar yerinden bu kullanıcı adına oluşan CRM fırsatları
+
+  //Real Estate ERP
+
+  // Medical App
+
+  slug           String           @default("slug")
+  rolemedical    RoleMedical      @default(USER)
+  plan           String?
+  password       String?
+  accountMedical AccountMedical[]
+  symptomIds     String[]
+  doctorProfile  DoctorProfile?
+
+  serviceId String?  @db.ObjectId
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  specialityId String?     @db.ObjectId
+  speciality   Speciality? @relation(fields: [specialityId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  //
+
+  displayName  String?
+  email        String? @unique
+  passwordHash String?
+  googleId     String?
+  avatarUrl    String?
+  bio          String?
+
+  image     String?
+  location  String?
+  portfolio String?
+
+  bannerUrl String?
+  bannerKey String?
+
+  reputation Int? @default(0)
+
+  role        Role           @default(USER)
+  rolejob     RoleJob        @default(CANDIDATE)
+  roleshop    RoleShop       @default(USER)
+  roleestate  RoleRealEstate @default(USER)
+  roleproject RoleProject    @default(USER)
+
+  sessions              Session[]      @relation("UserSessions")
+  posts                 Post[]         @relation("UserPosts")
+  following             Follow[]       @relation("Following")
+  followers             Follow[]       @relation("Followers")
+  likes                 Like[]         @relation("UserLikes")
+  bookmarks             Bookmark[]     @relation("UserBookmarks")
+  comments              Comment[]      @relation("UserComments")
+  notificationsSent     Notification[] @relation("Issuer") // Kullanıcının gönderdiği bildirimler
+  notificationsReceived Notification[] @relation("Recipient") // Kullanıcının aldığı bildirimler
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+
+  stores          Store[]              @relation("UserStores")
+  followingStores UserFollowingStore[]
+  reviews         Review[]             @relation("ReviewToUser")
+
+  cart              Cart?             @relation("UserCart")
+  shippingAddresses ShippingAddress[] @relation("UserShippingAddresses")
+
+  orders          Order[]          @relation("UserOrders")
+  wishlist        Wishlist[]       @relation("WishlistToUser")
+  payments        PaymentDetails[] @relation("PaymentDetailsToUser")
+  couponRelations CouponToUser[]
+
+  Company         Company[]
+  Candidate       Candidate[]
+  QuestionForum   QuestionForum[]
+  AnswerForum     AnswerForum[]
+  VoteForum       VoteForum[]
+  CollectionForum CollectionForum[]
+  Interaction     InteractionForum[]
+  Writer          Writer[]
+
+  sentMessages     Messages[]   @relation("sentMessages")
+  receivedMessages Messages[]   @relation("receivedMessages")
+  OnlineUser       OnlineUser[]
+
+  //Facebook Social2
+
+  cover          String?
+  postsocial     PostSocial[]
+  commentssocial CommentSocial[]
+
+  FriendRequestSocial  FriendRequest[] @relation("UserFriendsFriend")
+  FriendRequestSocials FriendRequest[] @relation("UserFriendsUser")
+  FollowSocial         FollowSocial[]  @relation("FollowerRelation")
+  FollowSocials        FollowSocial[]  @relation("FollowingRelation")
+  UserDetails          UserDetails[]
+  React                React[]
+  SavedPost            SavedPost[]
+  UserSearch           UserSearch[]
+  UserSearchs          UserSearch[]    @relation("SearchedUserRelation")
+
+  NotificationSocial  NotificationSocial[] @relation("NotificationFromUser")
+  NotificationSocials NotificationSocial[] @relation("NotificationToUser")
+  ExperienceSocial    ExperienceSocial[]
+
+  //Facebook Social2
+
+  //Shop2
+
+  cartData Json?
+
+  //
+
+  //Video
+
+  videos           Video[]
+  videoViews       VideoView[]
+  videoReactions   VideoReaction[]
+  subscriptions    Subscription[]    @relation("ViewerSubscriptions")
+  subscribers      Subscription[]    @relation("CreatorSubscribers")
+  commentsVideo    CommentVideo[]
+  playlists        Playlist[]
+  commentReactions CommentReaction[]
+
+  //Video
+
+  //Real Estate
+
+  Property     Property[]
+  Query        Query[]
+  Subscription SubscriptionEstate[]
+  isActive     Boolean              @default(true)
+
+  //
+
+  @@map("users")
+}
+
+model CouponToUser {
+  id       String @id @default(cuid()) @map("_id")
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  couponId String
+  coupon   Coupon @relation(fields: [couponId], references: [id])
+
+  @@unique([userId, couponId])
+  @@index([userId])
+  @@index([couponId])
+}
+
+model Session {
+  id        String   @id @map("_id") // MongoDB'deki _id'yi haritalamak için @map("_id")
+  userId    String
+  expiresAt DateTime
+  user      User     @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Post {
+  id      String @id @default(cuid()) @map("_id") // MongoDB'deki _id'yi haritalamak için @map("_id")
+  content String
+  userId  String
+  user    User   @relation("UserPosts", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  attachments   Media[]        @relation("PostMedia") // Post ile Media ilişkisi
+  comments      Comment[]      @relation("PostComments") // Post ile Comment ilişkisi
+  likes         Like[]         @relation("PostLikes") // Post ile Like ilişkisi
+  bookmarks     Bookmark[]     @relation("PostBookmarks") // Post ile Bookmark ilişkisi
+  notifications Notification[] @relation("PostNotifications") // Post ile bildirim ilişkisi
+
+  @@map("posts")
+}
+
+model Follow {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId // MongoDB için ObjectId kullanılır
+  followerId  String
+  follower    User   @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User   @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+model Media {
+  id     String    @id @default(cuid()) @map("_id") // MongoDB'deki _id'yi haritalamak için @map("_id")
+  postId String?
+  post   Post?     @relation("PostMedia", fields: [postId], references: [id], onDelete: SetNull) // Post ile Media arasında ilişki
+  type   MediaType
+  url    String
+
+  createdAt DateTime @default(now()) // Medyanın oluşturulma zamanı
+
+  @@map("post_media")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+model Comment {
+  id      String @id @default(cuid()) @map("_id") // MongoDB'ye uygun _id
+  content String
+  userId  String
+  user    User   @relation("UserComments", fields: [userId], references: [id], onDelete: Cascade)
+  postId  String
+  post    Post   @relation("PostComments", fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) // Yorumun oluşturulma zamanı
+
+  @@map("comments")
+}
+
+model Like {
+  id     String @id @default(cuid()) @map("_id") // MongoDB'ye uygun _id
+  userId String
+  user   User   @relation("UserLikes", fields: [userId], references: [id], onDelete: Cascade)
+  postId String
+  post   Post   @relation("PostLikes", fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId]) // Her kullanıcı bir postu yalnızca bir kez beğenebilir
+  @@map("likes")
+}
+
+model Bookmark {
+  id     String @id @default(cuid()) @map("_id") // MongoDB'deki _id'yi haritalamak için @map("_id")
+  userId String
+  user   User   @relation("UserBookmarks", fields: [userId], references: [id], onDelete: Cascade)
+  postId String
+  post   Post   @relation("PostBookmarks", fields: [postId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) // Bookmark'un oluşturulma zamanı
+
+  @@unique([userId, postId]) // Her kullanıcı bir postu yalnızca bir kez kaydedebilir
+  @@map("bookmarks")
+}
+
+model Notification {
+  id          String           @id @default(cuid()) @map("_id") // MongoDB'ye uygun _id ekliyoruz
+  recipientId String
+  recipient   User             @relation("Recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  issuerId    String
+  issuer      User             @relation("Issuer", fields: [issuerId], references: [id], onDelete: Cascade)
+  postId      String?
+  post        Post?            @relation("PostNotifications", fields: [postId], references: [id], onDelete: Cascade)
+  type        NotificationType
+  read        Boolean          @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  LIKE
+  FOLLOW
+  COMMENT
+}
+
+model Category {
+  id       String  @id @default(cuid()) @map("_id")
+  name     String
+  image    String
+  url      String  @unique
+  featured Boolean @default(false)
+
+  subCategories SubCategory[] @relation("CategoryToSubcategory")
+
+  products Product[] @relation("CategoryToProduct")
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+
+  @@map("categories")
+}
+
+model SubCategory {
+  id       String  @id @default(cuid()) @map("_id")
+  name     String
+  image    String
+  url      String  @unique
+  featured Boolean @default(false)
+
+  categoryId String
+  category   Category @relation("CategoryToSubcategory", fields: [categoryId], references: [id])
+
+  product Product[] @relation("SubCategoryToProduct")
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+
+  @@index([categoryId])
+  @@map("subcategories")
+}
+
+enum StoreStatus {
+  PENDING
+  ACTIVE
+  BANNED
+  DISABLED
+}
+
+model Store {
+  id                                  String      @id @default(cuid()) @map("_id")
+  name                                String
+  description                         String
+  email                               String      @unique
+  phone                               String
+  url                                 String      @unique
+  logo                                String
+  cover                               String
+  status                              StoreStatus @default(PENDING)
+  averageRating                       Float       @default(0)
+  featured                            Boolean     @default(false)
+  returnPolicy                        String      @default("Return in 30 days.")
+  defaultShippingService              String      @default("International Delivery")
+  defaultShippingFeePerItem           Float       @default(0)
+  defaultShippingFeeForAdditionalItem Float       @default(0)
+  defaultShippingFeePerKg             Float       @default(0)
+  defaultShippingFeeFixed             Float       @default(0)
+  defaultDeliveryTimeMin              Int         @default(7)
+  defaultDeliveryTimeMax              Int         @default(31)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation("UserStores", fields: [userId], references: [id])
+
+  products Product[] @relation("StoreToProduct")
+
+  shippingRates ShippingRate[]       @relation("StoreShippingRates")
+  followers     UserFollowingStore[]
+  cartItems     CartItem[]           @relation("CartItemToStore")
+  orderGroups   OrderGroup[]         @relation("OrderGroupToStore")
+  coupons       Coupon[]             @relation("CouponToStore")
+
+  @@index([userId])
+  @@map("store")
+}
+
+model UserFollowingStore {
+  id      String @id @default(cuid()) @map("_id")
+  userId  String
+  storeId String
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storeId])
+  @@index([userId])
+  @@index([storeId])
+  @@map("user_following_store")
+}
+
+enum ShippingFeeMethod {
+  ITEM
+  WEIGHT
+  FIXED
+}
+
+model Product {
+  id                String            @id @default(cuid()) @map("_id")
+  name              String
+  description       String
+  slug              String            @unique
+  brand             String
+  rating            Float             @default(0)
+  sales             Int               @default(0)
+  numReviews        Int               @default(0)
+  shippingFeeMethod ShippingFeeMethod @default(ITEM)
+  views             Int               @default(0)
+
+  freeShipping                FreeShipping? @relation("ProductFreeShipping")
+  freeShippingForAllCountries Boolean       @default(false)
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+
+  storeId String
+  store   Store  @relation("StoreToProduct", fields: [storeId], references: [id])
+
+  variants  ProductVariant[] @relation("ProductToProductVariant")
+  specs     Spec[]           @relation("ProductSpec")
+  questions Question[]       @relation("ProductQuestion")
+
+  reviews  Review[]   @relation("ReviewToProduct")
+  wishlist Wishlist[] @relation("WishlistToProduct")
+
+  categoryId String
+  category   Category @relation("CategoryToProduct", fields: [categoryId], references: [id])
+
+  subCategoryId String
+  subCategory   SubCategory @relation("SubCategoryToProduct", fields: [subCategoryId], references: [id])
+
+  offerTagId String?
+  offerTag   OfferTag? @relation("OfferTagToProduct", fields: [offerTagId], references: [id])
+
+  @@index([storeId])
+  @@index([categoryId])
+  @@index([subCategoryId])
+  @@index([offerTagId])
+}
+
+model ProductVariant {
+  id                 String  @id @default(cuid()) @map("_id")
+  variantName        String
+  variantDescription String?
+  variantImage       String
+  slug               String  @unique
+  isSale             Boolean @default(false)
+  saleEndDate        String?
+  keywords           String
+  sku                String
+  sales              Int     @default(0)
+  weight             Float
+
+  productId String
+  product   Product @relation("ProductToProductVariant", fields: [productId], references: [id])
+
+  sizes  Size[]                @relation("ProductVariantSizes")
+  images ProductVariantImage[] @relation("ProductVariantToVariantImage")
+  colors Color[]               @relation("ProductVariantColors")
+
+  specs    Spec[]     @relation("ProductVariantSpec")
+  wishlist Wishlist[] @relation("WishlistToProductVariant")
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+
+  @@index([productId])
+}
+
+model Size {
+  id       String @id @default(cuid()) @map("_id")
+  size     String
+  quantity Int
+  price    Float
+  discount Float  @default(0)
+
+  wishlist Wishlist[] @relation("WishlistToSize")
+
+  productVariantId String
+  productVariant   ProductVariant @relation("ProductVariantSizes", fields: [productVariantId], references: [id])
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+
+  @@index([productVariantId])
+}
+
+model ProductVariantImage {
+  id  String @id @default(cuid()) @map("_id")
+  url String
+  alt String @default("")
+
+  productVariantId String
+  productVariant   ProductVariant @relation("ProductVariantToVariantImage", fields: [productVariantId], references: [id])
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+
+  @@index([productVariantId])
+}
+
+model Color {
+  id   String @id @default(cuid()) @map("_id")
+  name String
+
+  productVariantId String
+  productVariant   ProductVariant @relation("ProductVariantColors", fields: [productVariantId], references: [id])
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+
+  @@index([productVariantId])
+}
+
+model Spec {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String
+  value     String
+  productId String?
+  product   Product? @relation("ProductSpec", fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String?
+  variant   ProductVariant? @relation("ProductVariantSpec", fields: [variantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+
+  @@index([productId])
+  @@index([variantId])
+}
+
+model Question {
+  id        String  @id @default(cuid()) @map("_id")
+  question  String
+  answer    String
+  productId String
+  product   Product @relation("ProductQuestion", fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+
+  @@index([productId])
+}
+
+model Country {
+  id   String @id @default(cuid()) @map("_id")
+  name String @unique
+  code String @unique
+
+  shippingRates         ShippingRate[]        @relation("CountryShippingRates")
+  freeShippingCountries FreeShippingCountry[] @relation("FreeShippingToCountry")
+  shippingAddresses     ShippingAddress[]     @relation("CountryToShippingAddress")
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+}
+
+model ShippingRate {
+  id String @id @default(cuid()) @map("_id")
+
+  shippingService              String
+  shippingFeePerItem           Float
+  shippingFeeForAdditionalItem Float
+  shippingFeePerKg             Float
+  shippingFeeFixed             Float
+  deliveryTimeMin              Int
+  deliveryTimeMax              Int
+  returnPolicy                 String
+
+  countryId String
+  country   Country @relation("CountryShippingRates", fields: [countryId], references: [id])
+
+  storeId String
+  store   Store  @relation("StoreShippingRates", fields: [storeId], references: [id])
+
+  createdAt DateTime @default(now()) // CreatedAt zamanını otomatik olarak ayarlıyoruz
+  updatedAt DateTime @updatedAt // UpdatedAt otomatik olarak güncelleniyor
+
+  @@index([countryId])
+  @@index([storeId])
+}
+
+model OfferTag {
+  id   String @id @default(cuid()) @map("_id")
+  name String
+  url  String @unique
+
+  products Product[] @relation("OfferTagToProduct")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model FreeShipping {
+  id        String  @id @default(cuid()) @map("_id")
+  productId String  @unique
+  product   Product @relation("ProductFreeShipping", fields: [productId], references: [id], onDelete: Cascade)
+
+  eligableCountries FreeShippingCountry[] @relation("FreeShippingCountries")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model FreeShippingCountry {
+  id             String       @id @default(cuid()) @map("_id")
+  freeShippingId String
+  freeShipping   FreeShipping @relation("FreeShippingCountries", fields: [freeShippingId], references: [id], onDelete: Cascade)
+
+  countryId String
+  country   Country @relation("FreeShippingToCountry", fields: [countryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([freeShippingId])
+  @@index([countryId])
+}
+
+model Review {
+  id           String  @id @default(cuid()) @map("_id")
+  variant      String
+  variantImage String?
+  review       String
+  rating       Float
+  color        String
+  size         String
+  quantity     String?
+  likes        Int     @default(0)
+
+  images    ReviewImage[] @relation("ReviewToReviewImage")
+  userId    String
+  user      User          @relation("ReviewToUser", fields: [userId], references: [id])
+  productId String
+  product   Product       @relation("ReviewToProduct", fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([productId, userId, variant]) // Ensures only one review per user, product and variant
+  @@index([userId])
+  @@index([productId])
+}
+
+model ReviewImage {
+  id       String @id @default(cuid()) @map("_id")
+  url      String
+  alt      String @default("")
+  reviewId String
+  review   Review @relation("ReviewToReviewImage", fields: [reviewId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([reviewId])
+}
+
+model Cart {
+  id     String @id @default(cuid()) @map("_id")
+  userId String @unique
+  user   User   @relation("UserCart", fields: [userId], references: [id], onDelete: Cascade)
+
+  couponId String?
+  coupon   Coupon? @relation("CouponToCart", fields: [couponId], references: [id])
+
+  cartItems    CartItem[] @relation("CartToCartItem")
+  shippingFees Float      @default(0)
+  subTotal     Float
+  total        Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([couponId])
+}
+
+model CartItem {
+  id          String @id @default(cuid()) @map("_id")
+  productId   String
+  variantId   String
+  sizeId      String
+  productSlug String
+  variantSlug String
+  sku         String
+  name        String
+  image       String
+  size        String
+  price       Float
+  quantity    Int    @default(1)
+  shippingFee Float  @default(0)
+  totalPrice  Float
+
+  cartId String
+  cart   Cart   @relation("CartToCartItem", fields: [cartId], references: [id], onDelete: Cascade)
+
+  storeId String
+  store   Store  @relation("CartItemToStore", fields: [storeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([cartId])
+  @@index([storeId])
+}
+
+model ShippingAddress {
+  id        String  @id @default(cuid()) @map("_id")
+  firstName String
+  lastName  String
+  phone     String
+  address1  String
+  address2  String?
+  state     String
+  city      String
+  zip_code  String
+  default   Boolean @default(false)
+
+  orders Order[] @relation("ShippingAddressToOrder")
+
+  userId String
+  user   User   @relation("UserShippingAddresses", fields: [userId], references: [id])
+
+  countryId String
+  country   Country @relation("CountryToShippingAddress", fields: [countryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([countryId])
+  @@index([userId])
+}
+
+enum OrderStatus {
+  Pending
+  Confirmed
+  Processing
+  Shipped
+  OutforDelivery
+  Delivered
+  Cancelled
+  Failed
+  Refunded
+  Returned
+  PartiallyShipped
+  OnHold
+}
+
+enum PaymentStatus {
+  Pending
+  Paid
+  Failed
+  Declined
+  Cancelled
+  Refunded
+  PartiallyRefunded
+  Chargeback
+}
+
+enum PaymentMethod {
+  Paypal
+  Stripe
+  COD
+  UPI
+}
+
+model Order {
+  id           String @id @default(cuid()) @map("_id")
+  shippingFees Float
+  subTotal     Float
+  total        Float
+
+  groups OrderGroup[] @relation("OrderGroupToOrder")
+
+  orderStatus   OrderStatus   @default(Pending)
+  paymentStatus PaymentStatus @default(Pending)
+
+  currency String @default("USD")
+
+  paymentMethod  PaymentMethod?
+  paymentDetails PaymentDetails? @relation("PaymentDetailsToOrder")
+
+  shippingAddressId String
+  shippingAddress   ShippingAddress @relation("ShippingAddressToOrder", fields: [shippingAddressId], references: [id])
+
+  userId String
+  user   User   @relation("UserOrders", fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([shippingAddressId])
+  @@index([userId])
+}
+
+model OrderGroup {
+  id     String      @id @default(cuid()) @map("_id")
+  status OrderStatus @default(Pending)
+
+  items OrderItem[] @relation("OrderItemToGroup")
+
+  trackingNumber  String?
+  shippingCompany String?
+  note            String?
+
+  shippingService     String
+  shippingDeliveryMin Int
+  shippingDeliveryMax Int
+  shippingFees        Float
+  subTotal            Float
+  total               Float
+
+  orderId String
+  order   Order  @relation("OrderGroupToOrder", fields: [orderId], references: [id])
+
+  storeId String
+  store   Store  @relation("OrderGroupToStore", fields: [storeId], references: [id])
+
+  couponId String?
+  coupon   Coupon? @relation("CouponToOrderGroup", fields: [couponId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([orderId])
+  @@index([storeId])
+  @@index([couponId])
+}
+
+enum ProductStatus {
+  /// Product has been added to the order but no action taken yet
+  Pending
+
+  /// Product is being prepared (picked, packed, or manufactured)
+  Processing
+
+  /// Product is packed and ready for shipment
+  ReadyForShipment
+
+  /// Product has been shipped
+  Shipped
+
+  /// Product has been delivered to the customer
+  Delivered
+
+  /// Product order has been canceled
+  Canceled
+
+  /// Product has been returned by the customer
+  Returned
+
+  /// Product cost has been refunded
+  Refunded
+
+  /// Delivery attempt failed, product may return to warehouse
+  FailedDelivery
+
+  /// Product is on hold (e.g., stock issues, verification required)
+  OnHold
+
+  /// Product is delayed due to stock unavailability
+  Backordered
+
+  /// Some units of the product were shipped, but the order is not yet complete
+  PartiallyShipped
+
+  /// Customer requested an exchange for the product
+  ExchangeRequested
+
+  /// Product is awaiting customer pickup (for pickup orders)
+  AwaitingPickup
+}
+
+model OrderItem {
+  id String @id @default(cuid()) @map("_id")
+
+  productId String
+  variantId String
+  sizeId    String
+
+  productSlug String
+  variantSlug String
+  sku         String
+  name        String
+  image       String
+  size        String
+  quantity    Int    @default(1)
+  shippingFee Float  @default(0)
+  price       Float
+  totalPrice  Float
+
+  orderGroupId String
+  orderGroup   OrderGroup @relation("OrderItemToGroup", fields: [orderGroupId], references: [id], onDelete: Cascade)
+
+  status ProductStatus @default(Pending)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([orderGroupId])
+}
+
+model Wishlist {
+  id String @id @default(cuid()) @map("_id")
+
+  userId String
+  user   User   @relation("WishlistToUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation("WishlistToProduct", fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation("WishlistToProductVariant", fields: [variantId], references: [id], onDelete: Cascade)
+
+  sizeId String?
+  size   Size?   @relation("WishlistToSize", fields: [sizeId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([sizeId])
+}
+
+model Coupon {
+  id        String  @id @default(cuid()) @map("_id")
+  code      String  @unique
+  startDate String
+  endDate   String?
+  discount  Int
+
+  storeId String
+  store   Store  @relation("CouponToStore", fields: [storeId], references: [id], onDelete: Cascade)
+
+  orders        OrderGroup[]   @relation("CouponToOrderGroup")
+  userRelations CouponToUser[]
+
+  carts Cart[] @relation("CouponToCart")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId])
+}
+
+model PaymentDetails {
+  id String @id @default(cuid()) @map("_id")
+
+  paymentInetntId String
+  paymentMethod   String
+  status          String
+  amount          Float
+  currency        String @default("USD") // YENİ: Currency alanı
+
+  orderId String @unique
+  order   Order  @relation("PaymentDetailsToOrder", fields: [orderId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("PaymentDetailsToUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Job Portal models
+
+model Industry {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   @db.String
+  slug      String   @unique @db.String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Company Company[]
+}
+
+model Organization {
+  id        String    @id @default(cuid()) @map("_id")
+  name      String    @unique @db.String
+  slug      String    @db.String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Company   Company[]
+
+  @@map("organizations")
+}
+
+model Team {
+  id        String    @id @default(cuid()) @map("_id")
+  name      String    @unique @db.String
+  slug      String    @db.String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Company   Company[]
+
+  @@map("teams")
+}
+
+model CountryJob {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   @unique @db.String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  states    State[]     @relation("CountryStates")
+  cities    City[]      @relation("CountryCities")
+  Jobs      Jobs[]
+  Candidate Candidate[]
+  Company   Company[]
+
+  @@map("countries")
+}
+
+model State {
+  id        String      @id @default(cuid()) @map("_id")
+  statename String      @unique @db.String
+  countryId String      @map("countryId")
+  country   CountryJob  @relation("CountryStates", fields: [countryId], references: [id])
+  cities    City[]      @relation("StateCities")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  Company   Company[]
+  Jobs      Jobs[]
+  Candidate Candidate[]
+
+  @@map("states")
+}
+
+model City {
+  id        String      @id @default(cuid()) @map("_id")
+  name      String
+  stateId   String?
+  countryId String?
+  state     State?      @relation("StateCities", fields: [stateId], references: [id])
+  country   CountryJob? @relation("CountryCities", fields: [countryId], references: [id])
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  Company   Company[]
+  Jobs      Jobs[]
+  Candidate Candidate[]
+
+  @@map("cities")
+}
+
+model Language {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   @db.String
+  slug      String   @unique @db.String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Skill {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   @unique @db.String
+  slug      String   @db.String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Jobskill Jobskill[]
+}
+
+model Profession {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Jobtype {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Jobs Jobs[]
+}
+
+model Salarytype {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   @db.String
+  slug      String   @unique @db.String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Jobs Jobs[]
+}
+
+model Jobcategory {
+  id        String   @id @default(cuid()) @map("_id")
+  icon      String
+  name      String   @db.String
+  slug      String   @unique @db.String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Jobs Jobs[]
+}
+
+model Educationid {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   @db.String
+  slug      String   @unique @db.String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Jobs Jobs[]
+}
+
+model Tag {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   @unique @db.String
+  slug      String   @unique @db.String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobtags Jobtag[]
+}
+
+model Jobrole {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   @unique
+  slug      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Jobs Jobs[]
+}
+
+model JobexperienceId {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String   @unique
+  slug      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Jobs      Jobs[]
+
+  @@map("jobexperience_id") // MongoDB koleksiyon ismi
+}
+
+model Company {
+  id              String  @id @default(cuid()) @map("_id")
+  userId          String  @unique
+  name            String
+  slug            String  @unique
+  bio             String?
+  vision          String?
+  logoPublicId    String  @default("")
+  logoSecureUrl   String  @default("")
+  bannerPublicId  String  @default("")
+  bannerSecureUrl String  @default("")
+
+  industryTypeId     String?
+  organizationTypeId String?
+  teamTypeId         String?
+  email              String?   @unique
+  phone              String?
+  establishmentDate  DateTime?
+  website            String?
+  totalViews         Int       @default(0)
+  address            String?
+  cityId             String?
+  stateId            String?
+  countryId          String?
+  mapLink            String?
+  isProfileVerified  Boolean   @default(false)
+  documentVerifiedAt DateTime?
+  profileCompletion  Boolean   @default(false)
+  visibility         Boolean   @default(false)
+
+  user             User          @relation(fields: [userId], references: [id])
+  industryType     Industry?     @relation(fields: [industryTypeId], references: [id])
+  organizationType Organization? @relation(fields: [organizationTypeId], references: [id])
+  teamType         Team?         @relation(fields: [teamTypeId], references: [id])
+  city             City?         @relation(fields: [cityId], references: [id])
+  state            State?        @relation(fields: [stateId], references: [id])
+  country          CountryJob?   @relation(fields: [countryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Jobs Jobs[]
+
+  Benfits Benfits[]
+
+  UserPlan UserPlan[]
+
+  OrderJob OrderJob[]
+
+  Userplan Userplan[]
+}
+
+enum SalaryMode {
+  range
+  custom
+}
+
+enum JobStatus {
+  active
+  expired
+  pending
+}
+
+enum ApplyOn {
+  app
+  email
+  custom_url
+}
+
+model Jobs {
+  id        String   @id @default(cuid()) @map("_id")
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
+
+  job_category  Jobcategory? @relation(fields: [jobCategoryId], references: [id])
+  jobCategoryId String?
+
+  job_role  Jobrole? @relation(fields: [jobRoleId], references: [id])
+  jobRoleId String?
+
+  job_experience  JobexperienceId? @relation(fields: [jobExperienceId], references: [id])
+  jobExperienceId String?
+
+  education   Educationid? @relation(fields: [educationId], references: [id])
+  educationId String?
+
+  job_type  Jobtype? @relation(fields: [jobTypeId], references: [id])
+  jobTypeId String?
+
+  salary_type  Salarytype? @relation(fields: [salaryTypeId], references: [id])
+  salaryTypeId String?
+
+  title     String @unique
+  slug      String @unique
+  vacancies String
+
+  min_salary    Int @default(0)
+  max_salary    Int @default(0)
+  custom_salary Int @default(0)
+
+  deadline DateTime?
+
+  description String?
+
+  status JobStatus @default(pending)
+
+  apply_on    ApplyOn @default(app)
+  apply_email String?
+  apply_url   String?
+
+  featured  Boolean @default(false)
+  highlight Boolean @default(false)
+
+  fetaured_until  DateTime?
+  highlight_until DateTime?
+
+  jobcount    Int @default(0)
+  total_views Int @default(0)
+
+  city   City?   @relation(fields: [cityId], references: [id])
+  cityId String?
+
+  state   State?  @relation(fields: [stateId], references: [id])
+  stateId String?
+
+  country   CountryJob? @relation(fields: [countryId], references: [id])
+  countryId String?
+
+  address String?
+
+  salary_mode SalaryMode @default(custom)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobtags Jobtag[]
+
+  Job_benfits Job_benfits[]
+
+  Jobskill Jobskill[]
+
+  Jobbookmark Jobbookmark[]
+
+  Applyjob Applyjob[]
+}
+
+model Jobtag {
+  id String @id @default(cuid()) @map("_id")
+
+  job   Jobs   @relation(fields: [jobId], references: [id])
+  jobId String
+
+  tag   Tag    @relation(fields: [tagId], references: [id])
+  tagId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Benfits {
+  id String @id @default(cuid()) @map("_id")
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
+
+  name String[] @db.String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Job_benfits Job_benfits[]
+}
+
+model Job_benfits {
+  id String @id @default(cuid()) @map("_id")
+
+  job   Jobs   @relation(fields: [jobId], references: [id])
+  jobId String
+
+  benfit    Benfits @relation(fields: [benfitsId], references: [id])
+  benfitsId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Jobskill {
+  id String @id @default(cuid()) @map("_id")
+
+  job   Jobs   @relation(fields: [jobId], references: [id])
+  jobId String
+
+  skill   Skill  @relation(fields: [skillId], references: [id])
+  skillId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Plan {
+  id                String   @id @default(cuid()) @map("_id")
+  leble             String   @map("label")
+  price             Float
+  joblimit          Int      @map("job_limit")
+  featuredjoblimit  Int      @map("featured_job_limit")
+  highlightjoblimit Int      @map("highlight_job_limit")
+  recommended       Boolean  @default(false)
+  frontendshow      Boolean  @default(false) @map("frontend_show")
+  profileverify     Boolean  @default(false) @map("profile_verify")
+  home              Boolean  @default(false)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  userPlans UserPlan[]
+  OrderJob  OrderJob[]
+  Userplan  Userplan[]
+
+  @@map("plans")
+}
+
+model UserPlan {
+  id                String   @id @default(cuid()) @map("_id")
+  companyId         String   @map("company_id")
+  planId            String   @map("plan_id")
+  jobLimit          Int      @default(0) @map("job_limit")
+  featuredJobLimit  Int      @default(0) @map("featured_job_limit")
+  highlightJobLimit Int      @default(0) @map("highlight_job_limit")
+  profileVerify     Int      @default(0) @map("profile_verify")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+  plan    Plan    @relation(fields: [planId], references: [id])
+
+  @@map("userplans")
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum MaritalStatus {
+  married
+  single
+}
+
+enum Status {
+  available
+  not_available
+}
+
+model Candidate {
+  id     String  @id @default(cuid()) @map("_id")
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String? @unique
+
+  professionIds String[]
+
+  experience_lable String?
+
+  skill_id String[]
+
+  image_public_id  String?
+  image_secure_url String?
+
+  title      String?
+  full_name  String?
+  slug       String?
+  email      String?
+  phone_one  String?
+  phone_two  String?
+  birth_date DateTime?
+  website    String?
+  cv         String?
+  bio        String?
+
+  gender         Gender?
+  marital_status MaritalStatus?
+  address        String?
+
+  city   City?   @relation(fields: [cityId], references: [id])
+  cityId String?
+
+  state   State?  @relation(fields: [stateId], references: [id])
+  stateId String?
+
+  country   CountryJob? @relation(fields: [countryId], references: [id])
+  countryId String?
+
+  status             Status?
+  profile_completion Boolean @default(false)
+  visibility         Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  CandidateSkill CandidateSkill[]
+
+  CandidateLanguage CandidateLanguage[]
+
+  Experience Experience[]
+
+  JobEducation JobEducation[]
+
+  Jobbookmark Jobbookmark[]
+
+  Applyjob Applyjob[]
+}
+
+model CandidateSkill {
+  id          String   @id @default(cuid()) @map("_id")
+  candidateId String
+  skillIds    String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+}
+
+model CandidateLanguage {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  candidateId String
+  langIds     String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id])
+}
+
+model Experience {
+  id                String    @id @default(cuid()) @map("_id")
+  candidate_id      String
+  candidate         Candidate @relation(fields: [candidate_id], references: [id])
+  company           String
+  department        String
+  designation       String
+  start             DateTime?
+  end               DateTime?
+  responsibilities  String
+  currently_working Boolean?  @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model JobEducation {
+  id           String    @id @default(cuid()) @map("_id")
+  candidate    Candidate @relation(fields: [candidate_id], references: [id])
+  candidate_id String
+
+  level  String
+  degree String
+  year   String?
+  notes  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PaymentSettings {
+  id        String   @id @default(cuid()) @map("_id")
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SiteSettings {
+  id        String   @id @default(cuid()) @map("_id")
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum PaymentStatusJob {
+  paid
+  unpaid
+  pending
+}
+
+model OrderJob {
+  id         String @id @default(cuid()) @map("_id")
+  company_id String
+  plan_id    String
+
+  package_name     String
+  transaction_id   String
+  order_id         String
+  payment_provider String
+  amount           String
+  paid_in_currency String
+  default_amount   String
+  payment_status   PaymentStatusJob?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [company_id], references: [id])
+  plan    Plan    @relation(fields: [plan_id], references: [id])
+}
+
+model Userplan {
+  id         String @id @default(cuid()) @map("_id")
+  company_id String
+  plan_id    String
+
+  job_limit           Int
+  featured_job_limit  Int
+  highlight_job_limit Int
+  profile_verify      Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [company_id], references: [id])
+  plan    Plan    @relation(fields: [plan_id], references: [id])
+}
+
+model Jobbookmark {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  candidateId String
+
+  job   Jobs   @relation(fields: [jobId], references: [id])
+  jobId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Applyjob {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  candidateId String
+  job         Jobs      @relation(fields: [jobId], references: [id])
+  jobId       String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Blog {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  title       String  @db.String
+  slug        String  @unique
+  description String  @db.String
+  image       String? @db.String
+
+  createdAt DateTime @default(now()) @map("createdAt")
+  updatedAt DateTime @updatedAt @map("updatedAt")
+
+  @@map("blogs")
+}
+
+//StackOverflow Models
+
+model QuestionForum {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  content   String
+  views     Int    @default(0)
+  answers   Int    @default(0)
+  upvotes   Int    @default(0)
+  downvotes Int    @default(0)
+
+  UserId String?
+  user   User?   @relation(fields: [UserId], references: [id])
+
+  tagQuestions TagQuestionForum[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  AnswerForum     AnswerForum[]
+  CollectionForum CollectionForum[]
+}
+
+model TagQuestionForum {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  tagId String   @db.ObjectId
+  tag   TagForum @relation(fields: [tagId], references: [id])
+
+  questionId String        @db.ObjectId
+  question   QuestionForum @relation(fields: [questionId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model AnswerForum {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  content String
+
+  UserId String
+  user   User   @relation(fields: [UserId], references: [id])
+
+  questionId String        @db.ObjectId
+  question   QuestionForum @relation(fields: [questionId], references: [id])
+
+  upvotes   Int @default(0)
+  downvotes Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TagForum {
+  id           String             @id @default(auto()) @map("_id") @db.ObjectId
+  name         String             @unique
+  tagQuestions TagQuestionForum[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VoteForum {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String @map("userId")
+  user   User   @relation(fields: [userId], references: [id])
+
+  actionId   String     @db.ObjectId
+  actionType ActionType
+  voteType   VoteType
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ActionType {
+  question
+  answer
+}
+
+enum VoteType {
+  upvote
+  downvote
+}
+
+model CollectionForum {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  questionId String        @db.ObjectId
+  question   QuestionForum @relation(fields: [questionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InteractionForum {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  action String
+
+  actionId   String                @db.ObjectId
+  actionType ActionTypeInteraction
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ActionTypeInteraction {
+  question
+  answer
+}
+
+// Newsportal models ---------------------------------------------------------
+
+model Writer {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  penName   String
+  category  String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  createdAt DateTime @default(now())
+
+  Image Image[]
+}
+
+model News {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  writerId      String
+  writerName    String
+  title         String
+  slug          String   @unique
+  image         String
+  imagePublicId String? // Cloudinary public ID için
+  category      String
+  description   String   @default("")
+  date          String
+  status        String   @default("pending")
+  count         Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("news")
+}
+
+model Image {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  writerId String @db.ObjectId
+  url      String
+
+  writer Writer @relation(fields: [writerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("images")
+}
+
+model CategoryNews {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categoriesnews")
+}
+
+////////////////////////////
+
+model Messages {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  senderId      String
+  receiverId    String
+  sender        User        @relation("sentMessages", fields: [senderId], references: [id])
+  receiver      User        @relation("receivedMessages", fields: [receiverId], references: [id])
+  type          MessageType @default(text)
+  message       String
+  messageStatus String      @default("sent")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+enum MessageType {
+  text
+  image
+  video
+  audio
+}
+
+model OnlineUser {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @unique
+  socketId    String
+  connectedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+//Social2 Facebook
+
+model PostSocial {
+  id         String          @id @default(auto()) @map("_id") @db.ObjectId
+  type       String? // "story", "post", "profilePicture", "cover" vb.
+  text       String?
+  images     String[]        @default([])
+  videos     String[]        @default([])
+  background String?
+  user       User            @relation(fields: [userId], references: [id])
+  userId     String
+  comments   CommentSocial[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  React     React[]
+  SavedPost SavedPost[]
+
+  expiresAt DateTime? // Story'nin son kullanma tarihi (24 saat)
+  viewers   Json? // Story'yi kimler gördü
+}
+
+model ExperienceSocial {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  title            String
+  companyName      String
+  companyLogo      String?
+  location         String?
+  description      String?
+  startDate        DateTime
+  endDate          DateTime?
+  currentlyWorking Boolean   @default(false)
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model CommentSocial {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  comment     String?
+  image       String?
+  commentBy   User       @relation(fields: [commentById], references: [id])
+  commentById String
+  commentAt   DateTime   @default(now())
+  post        PostSocial @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId      String     @db.ObjectId
+}
+
+model FriendRequest {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String
+  friendId  String
+  status    String // 'pending', 'accepted', etc.
+  createdAt DateTime @default(now())
+  user      User     @relation("UserFriendsUser", fields: [userId], references: [id])
+  friend    User     @relation("UserFriendsFriend", fields: [friendId], references: [id])
+}
+
+model UserDetails {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String  @unique
+  biosocial    String?
+  otherName    String?
+  job          String?
+  workplace    String?
+  highSchool   String?
+  college      String?
+  currentCity  String?
+  hometown     String?
+  relationship String?
+  instagram    String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("userDetails")
+}
+
+model FollowSocial {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  followerId  String
+  followingId String
+
+  follower  User  @relation("FollowerRelation", fields: [followerId], references: [id])
+  following User? @relation("FollowingRelation", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+}
+
+enum ReactType {
+  like
+  love
+  haha
+  sad
+  angry
+  wow
+}
+
+model React {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  react     ReactType
+  postRef   PostSocial @relation(fields: [postRefId], references: [id], onDelete: Cascade)
+  postRefId String     @db.ObjectId
+  reactBy   User       @relation(fields: [reactById], references: [id])
+  reactById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SavedPost {
+  id      String     @id @default(auto()) @map("_id") @db.ObjectId
+  post    PostSocial @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId  String     @db.ObjectId
+  savedAt DateTime   @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  @@unique([userId, postId])
+}
+
+model UserSearch {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  searchedUser   User   @relation("SearchedUserRelation", fields: [searchedUserId], references: [id])
+  searchedUserId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, searchedUserId]) // Aynı kullanıcı için aynı aranan kullanıcı duplicasyonu engeller
+}
+
+model NotificationSocial {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  type       String // "like", "comment", "follow", "friendRequest", etc.
+  message    String? // "Ahmet fotoğrafını beğendi" gibi
+  fromUser   User     @relation("NotificationFromUser", fields: [fromUserId], references: [id])
+  fromUserId String
+  toUser     User     @relation("NotificationToUser", fields: [toUserId], references: [id])
+  toUserId   String
+  postId     String?  @db.ObjectId // eğer bir post ile ilgiliyse
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([toUserId])
+}
+
+//////////////////////////////////////////////
+
+/////VideoClone
+
+enum ReactionType {
+  like
+  dislike
+}
+
+enum VideoVisibility {
+  private
+  public
+}
+
+model Video {
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  title          String
+  description    String?
+  muxStatus      String?
+  muxAssetId     String?
+  muxUploadId    String?
+  muxPlaybackId  String?
+  muxTrackId     String?
+  muxTrackStatus String?
+  thumbnailUrl   String?
+  thumbnailKey   String?
+  previewUrl     String?
+  previewKey     String?
+  duration       Int             @default(0)
+  visibility     VideoVisibility @default(private)
+  userId         String
+  categoryId     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id])
+  category       VideoCategory?  @relation(fields: [categoryId], references: [id])
+  views          VideoView[]
+  reactions      VideoReaction[]
+  comments       CommentVideo[]
+  playlistVideos PlaylistVideo[]
+}
+
+model VideoView {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String
+  videoId   String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id])
+  video Video @relation(fields: [videoId], references: [id])
+}
+
+model VideoReaction {
+  id        String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String
+  videoId   String       @db.ObjectId
+  type      ReactionType
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id])
+  video Video @relation(fields: [videoId], references: [id])
+}
+
+model Subscription {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  viewerId  String
+  creatorId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  viewer  User @relation("ViewerSubscriptions", fields: [viewerId], references: [id])
+  creator User @relation("CreatorSubscribers", fields: [creatorId], references: [id])
+}
+
+model CommentVideo {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  parentId  String?  @db.ObjectId
+  userId    String
+  videoId   String   @db.ObjectId
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id])
+  video     Video             @relation(fields: [videoId], references: [id])
+  parent    CommentVideo?     @relation("CommentVideoParent", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   CommentVideo[]    @relation("CommentVideoParent")
+  reactions CommentReaction[]
+}
+
+model CommentReaction {
+  id        String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String
+  commentId String       @db.ObjectId
+  type      ReactionType
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  user    User         @relation(fields: [userId], references: [id])
+  comment CommentVideo @relation(fields: [commentId], references: [id])
+}
+
+model Playlist {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id])
+  playlistVideos PlaylistVideo[]
+}
+
+model PlaylistVideo {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  playlistId String   @db.ObjectId
+  videoId    String   @db.ObjectId
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  playlist Playlist @relation(fields: [playlistId], references: [id])
+  video    Video    @relation(fields: [videoId], references: [id])
+}
+
+model VideoCategory {
+  id          String   @id @default(cuid()) @map("_id")
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  videos Video[]
+}
+
+//VideoClone
+
+//////////////////////////////////
+
+model ProfileInstagram {
+  id       String  @id @default(auto()) @map("_id") @db.ObjectId
+  email    String  @unique
+  avatar   String?
+  username String?
+  name     String?
+  subtitle String?
+  bio      String?
+}
+
+model PostInstagram {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  author      String
+  image       String
+  description String
+  likesCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CommentInstagram {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  postId    String   @db.ObjectId
+  author    String
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LikeInstagram {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  postId    String   @db.ObjectId
+  author    String
+  createdAt DateTime @default(now())
+}
+
+model BookmarkInstagram {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  postId    String   @db.ObjectId
+  author    String
+  createdAt DateTime @default(now())
+}
+
+model FollowerInstagram {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  followingProfileEmail String
+  followingProfileId    String   @db.ObjectId
+  followedProfileId     String   @db.ObjectId
+  createdAt             DateTime @default(now())
+}
+
+//////////////////////////////////
+
+////
+
+model LandingPageSection {
+  id       String  @id @default(cuid()) @map("_id")
+  type     String // banner, categories, deals, products, newsletter, stats, features, cta, download, limited, hero
+  title    String?
+  subtitle String?
+  active   Boolean @default(true)
+  order    Int     @default(0)
+  data     Json    @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images LandingPageImage[]
+
+  @@index([type])
+  @@index([order])
+  @@map("landing_page_sections")
+}
+
+model LandingPageImage {
+  id        String  @id @default(cuid()) @map("_id")
+  sectionId String
+  url       String
+  alt       String?
+  type      String // main, gallery, thumbnail, background, icon, side
+  order     Int     @default(0)
+
+  // Ürün link alanları
+  link        String? // Tam link: /shop/productdetails/urun-slugu?variant=xxx
+  productSlug String? // Sadece ürün slug'ı
+  variantId   String? // Varyant ID
+  size        String? // large, medium, small
+
+  section LandingPageSection @relation(fields: [sectionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sectionId])
+  @@index([type])
+  @@map("landing_page_images")
+}
+
+/////////////////////////////////////////////
+
+//Real Estate 
+
+// subscription model
+model SubscriptionEstate {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  plan      Json
+  paymentId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// property model
+model Property {
+  id               String   @id @default(cuid()) @map("_id")
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  name             String
+  description      String
+  type             String
+  status           String
+  price            Float
+  city             String
+  pincode          String
+  address          String
+  landmark         String
+  bedrooms         Int
+  bathrooms        Int
+  balconies        Int
+  furnishing       String
+  parking          String
+  floors           Int
+  area             Float
+  facing           String
+  age              Int
+  images           String[]
+  ownerName        String
+  ownerEmail       String
+  ownerPhone       String
+  showOwnerContact Boolean  @default(false)
+  isActive         Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Query     Query[]
+}
+
+// query model
+
+model Query {
+  id          String   @id @default(cuid()) @map("_id")
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  quoteAmount Float
+  name        String
+  phoneNumber String
+  message     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Finance App
+
+model Account {
+  id      String  @id @default(cuid()) @map("_id")
+  plaidId String?
+  name    String
+  userId  String
+
+  transactions Transaction[]
+
+  @@map("accounts")
+}
+
+model CategoryFinance {
+  id      String  @id @default(cuid()) @map("_id")
+  plaidId String?
+  name    String
+  userId  String
+
+  transactions Transaction[]
+
+  @@map("categoriesfinance")
+}
+
+model Transaction {
+  id     String   @id @default(cuid()) @map("_id")
+  amount Int
+  payee  String
+  notes  String?
+  date   DateTime
+
+  accountId  String
+  categoryId String?
+
+  account  Account          @relation(fields: [accountId], references: [id])
+  category CategoryFinance? @relation(fields: [categoryId], references: [id])
+
+  @@map("transactions")
+}
+
+model ConnectedBank {
+  id          String @id @default(cuid()) @map("_id")
+  userId      String
+  accessToken String
+
+  @@map("connected_banks")
+}
+
+model SubscriptionFinance {
+  id             String @id @default(cuid()) @map("_id")
+  userId         String @unique
+  subscriptionId String @unique
+  status         String
+
+  @@map("subscriptions")
+}
+
+//
+
+// Project Management Project Schemas
+
+model AccountProject {
+  id                String  @id @default(cuid()) @map("_id")
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Folder {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  files     File[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model File {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String
+  type      String
+  url       String
+  size      Int
+  folder    Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  folderId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PortfolioProfile {
+  id           String   @id @default(cuid()) @map("_id")
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
+  name         String
+  profileImage String?
+  location     String
+  projectCount Float
+  email        String
+  bookingLink  String
+  description  String
+  twitterUrl   String?
+  youtubeUrl   String?
+  linkedinUrl  String?
+  instagramUrl String?
+  githubUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Subscriber {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ProjectStatus {
+  COMPLETE
+  ONGOING
+}
+
+model Project {
+  id           String           @id @default(cuid()) @map("_id")
+  name         String
+  slug         String           @unique
+  notes        String?
+  description  String?
+  bannerImage  String?
+  gradient     String?
+  freeDomain   String?          @default("https://test.vercel.app")
+  customDomain String?          @default("https://test.com")
+  thumbnail    String?
+  budget       Float?           @default(0)
+  budgetLocal  Float?           @default(0)
+  deadline     Int?
+  startDate    DateTime         @default(now())
+  endDate      DateTime?
+  isPublic     Boolean          @default(false)
+  status       ProjectStatus    @default(ONGOING)
+  clientId     String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  modules      Module[]
+  comments     ProjectComment[]
+  members      Member[]
+  invoices     Invoice[]
+  payments     Payment[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model ProjectComment {
+  id        String      @id @default(cuid()) @map("_id")
+  content   String
+  projectId String
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userName  String
+  userRole  RoleProject
+  user      User        @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model GuestProject {
+  id           String   @id @default(cuid()) @map("_id")
+  projectLink  String
+  projectName  String
+  guestName    String
+  projectOwner String
+  user         User     @relation(fields: [gustId], references: [id], onDelete: Cascade)
+  gustId       String
+  ownerId      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Module {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  userName  String
+  userId    String
+  projectId String
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Member {
+  id          String   @id @default(cuid()) @map("_id")
+  name        String
+  email       String
+  roleproject String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Invoice {
+  id            String   @id @default(cuid()) @map("_id")
+  invoiceNumber String   @unique
+  amount        Float
+  status        String
+  dueDate       DateTime
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId     String
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Payment {
+  id            String   @id @default(cuid()) @map("_id")
+  title         String
+  amount        Float
+  // amountLocal  Float?
+  tax           Float
+  date          DateTime @default(now())
+  invoiceNumber String   @unique
+  method        String
+  user          User     @relation(fields: [userId], references: [id])
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId        String
+  clientId      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model PortfolioItem {
+  id          String   @id @default(cuid()) @map("_id")
+  title       String
+  description String
+  imageUrl    String?
+  projectUrl  String?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum TaskStatus {
+  TODO
+  INPROGRESS
+  COMPLETE
+}
+
+model Task {
+  id        String     @id @default(cuid()) @map("_id")
+  title     String
+  status    TaskStatus @default(TODO)
+  module    Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  moduleId  String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CategoryProject {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  slug        String  @unique
+  imageUrl    String?
+  description String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+}
+
+////
+
+//Medical App
+
+model AccountMedical {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+enum RoleMedical {
+  USER
+  ADMIN
+  DOCTOR
+}
+
+model Service {
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  doctors        User[]
+  title          String
+  slug           String          @unique
+  imageUrl       String
+  doctorProfiles DoctorProfile[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model Speciality {
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  doctors        User[]
+  title          String
+  slug           String          @unique
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  doctorProfiles DoctorProfile[]
+}
+
+model Symptom {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Inbox {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  recieverId  String
+  senderId    String
+  senderName  String
+  senderEmail String
+  subject     String
+  body        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum AppointmentStatus {
+  pending
+  rejected
+  approved
+}
+
+model Appointment {
+  id                       String            @id @default(auto()) @map("_id") @db.ObjectId
+  appointmentDate          DateTime?
+  appointmentFormattedDate String
+  doctorId                 String
+  doctorName               String?
+  patientId                String
+  charge                   Int
+  appointmentTime          String?
+  // Patient details
+  firstName                String?
+  lastName                 String?
+  gender                   String?
+  phone                    String?
+  email                    String?
+  dob                      DateTime?
+  location                 String?
+  appointmentReason        String?
+  medicalDocuments         String[]
+  occupation               String?
+  status                   AppointmentStatus @default(pending)
+  meetingLink              String            @default("")
+  meetingProvider          String            @default("zoom")
+
+  // Stripe ödeme alanları
+  paymentIntentId String?
+  paymentStatus   String?   @default("unpaid") // unpaid, paid, refunded
+  paymentAmount   Int? // stripe amount in cents
+  paymentMethod   String?
+  paymentDate     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum DoctorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Availability {
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  doctorProfileId String        @unique @db.ObjectId
+  doctorProfile   DoctorProfile @relation(fields: [doctorProfileId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  monday          String[]
+  tuesday         String[]
+  wednesday       String[]
+  thursday        String[]
+  friday          String[]
+  saturday        String[]
+  sunday          String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DoctorProfile {
+  id                   String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String        @unique
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  status               DoctorStatus  @default(PENDING)
+  trackingNumber       String        @unique
+  firstName            String
+  lastName             String
+  middleName           String?
+  dob                  DateTime?
+  gender               String?
+  page                 String?
+  availability         Availability?
+  profilePicture       String?
+  bio                  String?
+  medicalLicense       String?
+  medicalLicenseExpiry DateTime?
+  yearsOfExperience    Int?
+
+  email                    String?
+  phone                    String?
+  country                  String?
+  city                     String?
+  state                    String?
+  medicalSchool            String?
+  graduationYear           String?
+  primarySpecialization    String?
+  otherSpecialties         String[]
+  boardCertificates        String[]
+  hospitalName             String?
+  hospitalAddress          String?
+  hospitalContactNumber    String?
+  hospitalEmailAddress     String?
+  hospitalWebsite          String?
+  hospitalHoursOfOperation Int?
+  servicesOffered          String[]
+  insuranceAccepted        String?
+  educationHistory         String?
+  research                 String?
+  accomplishments          String?
+  additionalDocs           String[]
+  operationMode            String?     @default("Telehealth visit")
+  hourlyWage               Int         @default(100)
+  //SERVICES
+  serviceId                String?     @db.ObjectId
+  service                  Service?    @relation(fields: [serviceId], references: [id])
+  specialtyId              String?     @db.ObjectId
+  specialty                Speciality? @relation(fields: [specialtyId], references: [id])
+  symptomIds               String[]    @db.ObjectId
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime?   @updatedAt
+}
+
+enum AppointmentStatusMedical {
+  pending
+  rejected
+  approved
+  paid
+}
+
+////
+
+//Invoice Generator Start
+
+model AccountInvoice {
+  id                String  @id @default(cuid()) @map("_id")
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+enum UserRoleInvoice {
+  USER
+  ADMIN
+  SERVICE_PROVIDER
+}
+
+enum SubscriptionPlan {
+  FREE
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIALING
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  UNPAID
+}
+
+enum PaymentStatusInvoice {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+model SubscriptionInvoice {
+  id     String @id @default(cuid()) @map("_id")
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Stripe related fields
+  stripeSubscriptionId String?
+  stripePriceId        String?
+  stripeCustomerId     String?
+
+  // Subscription details
+  plan               SubscriptionPlan   @default(FREE)
+  status             SubscriptionStatus @default(INACTIVE)
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean            @default(false)
+  cancelAt           DateTime?
+  canceledAt         DateTime?
+  trialStart         DateTime?
+  trialEnd           DateTime?
+
+  // Pricing
+  priceAmount   Int? // Amount in cents
+  priceCurrency String? @default("usd")
+  interval      String? // month, year
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriptionsinvoice")
+}
+
+model PaymentInvoice {
+  id     String @id @default(cuid()) @map("_id")
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Stripe related fields
+  stripePaymentId  String  @unique
+  stripeCustomerId String?
+  stripeInvoiceId  String?
+
+  // Payment details
+  amount      Int // Amount in cents
+  currency    String               @default("usd")
+  status      PaymentStatusInvoice @default(PENDING)
+  description String?
+
+  // Plan information
+  plan     SubscriptionPlan
+  interval String? // month, year for subscription payments
+
+  // Receipt and invoice
+  receiptUrl String?
+  invoiceUrl String?
+
+  // Timestamps
+  paidAt     DateTime?
+  failedAt   DateTime?
+  refundedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payments")
+}
+
+// Optional: Track plan limits and usage
+
+model PlanLimit {
+  id                String           @id @default(cuid()) @map("_id")
+  plan              SubscriptionPlan @unique
+  maxDailyInvoices  Int?             @default(2)
+  maxClients        Int? // null means unlimited
+  customBranding    Boolean          @default(false)
+  prioritySupport   Boolean          @default(false)
+  teamAccess        Boolean          @default(false)
+  exportFormats     String[]         @default(["PDF"])
+  canRemoveBranding Boolean          @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("plan_limits")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum InvoiceTemplate {
+  PROFESSIONAL
+  MODERN
+  CLASSIC
+  MINIMAL
+}
+
+// User Brand Model (One-to-One with User)
+model Brand {
+  id     String @id @default(cuid()) @map("_id")
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Brand Information
+  name       String
+  logo       String? // URL to logo image
+  currency   String? @default("$") // URL to logo image
+  slogan     String?
+  phone      String?
+  address    String?
+  email      String?
+  brandColor String? @default("#000000")
+
+  // Template Selection
+  template InvoiceTemplate @default(PROFESSIONAL)
+
+  // Payment Information
+  paymentInfo String? // Bank details, payment methods, etc.
+
+  // Messages
+  thankYouMsg String? // Thank you message for invoices
+  contactInfo String? // Thank you message for invoices
+
+  // Tax Information
+  taxRate      Float? // Tax rate as percentage (e.g., 8.25%)
+  salesTax     Float? // Fixed sales tax amount
+  otherCharges Float? // Other fixed charges
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("brands")
+}
+
+// User Clients Model
+model Client {
+  id     String @id @default(cuid()) @map("_id")
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Client Information
+  contactPerson String
+  companyName   String
+  location      String? // Address/Location
+  phone         String?
+  email         String?
+  customerID    String?
+
+  // Additional client details
+  notes    String? // Optional notes about the client
+  isActive Boolean @default(true)
+
+  // Relationships
+  invoices InvoiceModel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("clients")
+}
+
+// Invoice Model
+
+model InvoiceModel {
+  id       String @id @default(cuid()) @map("_id")
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Invoice Details
+  invoiceNumber String
+  invoiceDate   DateTime @default(now())
+  dueDate       DateTime
+  preparedBy    String? // Who prepared the invoice
+
+  // Status and tracking
+  status InvoiceStatus @default(DRAFT)
+
+  // Financial totals (calculated from items)
+  subtotal    Float @default(0)
+  taxAmount   Float @default(0)
+  totalAmount Float @default(0)
+
+  // Additional fields
+  notes String? // Invoice notes
+  terms String? // Payment terms
+
+  // Tracking
+  sentAt   DateTime? // When invoice was sent
+  viewedAt DateTime? // When client viewed invoice
+  paidAt   DateTime? // When invoice was paid
+
+  // Relationships
+  items InvoiceItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("invoices")
+}
+
+// Invoice Item Model
+model InvoiceItem {
+  id        String       @id @default(cuid()) @map("_id")
+  invoiceId String
+  invoice   InvoiceModel @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  // Item Details
+  description String
+  quantity    Float
+  unitPrice   Float
+  totalPrice  Float
+
+  // Optional fields
+  itemOrder Int? // Order of items in the invoice
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("invoice_items")
+}
+
+//Invoice Generator Finish
+
+//School Management Start
+
+model School {
+  id           String  @id @default(cuid()) @map("_id")
+  name         String
+  logo         String?
+  primaryEmail String?
+  slug         String  @unique
+
+  users User[] // <--- BUNU EKLEYİN (User modelindeki school ile eşleşecek)
+
+  // Add relations
+  userLogs               UserLog[] // One-to-many with students
+  galleryImages          GalleryImage[] // One-to-many with students
+  galleryImageCategories GalleryCategory[] // One-to-many with students
+  events                 Event[]
+  recentActivities       RecentActivity[]
+  reminders              Reminder[]
+  students               Student[] // One-to-many with students
+  sections               Section[] // One-to-many with sections
+  sectionCount           Int                @default(0)
+  siteEnabled            Boolean            @default(false)
+  siteCompletion         Int                @default(0)
+  exams                  Exam[] // One-to-many with exams
+  newsItems              NewsItem[] // One-to-many with news
+  periods                Period[] // One-to-many with periods
+  classes                Class[] // One-to-many with classes
+  parents                Parent[] // One-to-many with parents
+  departments            Department[] // One-to-many with parents
+  teachers               Teacher[] // One-to-many with parents
+  streams                Stream[] // One-to-many with streams
+  subjects               Subject[] // One-to-many with streams
+  attendanceLogs         AttendanceLog[] // One-to-many with streams
+  schoolFees             SchoolFee[] // One-to-many with streams
+  schoolFeesPayments     SchoolFeePayment[] // One-to-many with streams
+
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  schoolMessages SchoolContactMessage[]
+
+  @@map("schools")
+}
+
+model Contact {
+  id         String   @id @default(cuid()) @map("_id")
+  fullName   String
+  email      String   @unique
+  phone      String
+  school     String   @unique
+  country    String
+  schoolPage String
+  students   Int
+  role       String
+  media      String
+  message    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("contacts")
+}
+
+model Class {
+  id    String @id @default(cuid()) @map("_id")
+  title String
+  slug  String @unique
+
+  schoolId String // Foreign key to School
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Add class teacher relationship
+
+  classTeacherId   String?
+  classTeacherName String?
+  classTeacher     Teacher?        @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  students         Student[]
+  examClasses      ExamClass[]
+  marksheets       Marksheet[]
+  studentMarks     StudentMark[]
+  streams          Stream[] // One-to-many relationship with Stream
+  schoolFees       SchoolFee[] // One-to-many relationship with Stream
+  attendanceLogs   AttendanceLog[]
+
+  @@map("classes")
+}
+
+model ExamClass {
+  id         String   @id @default(cuid()) @map("_id")
+  examId     String
+  examTitle  String
+  classId    String
+  classTitle String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relationships
+  exam  Exam  @relation(fields: [examId], references: [id])
+  class Class @relation(fields: [classId], references: [id])
+
+  @@unique([examId, classId])
+}
+
+model ExamSubject {
+  id           String   @id @default(cuid()) @map("_id")
+  examId       String
+  examTitle    String
+  subjectId    String
+  subjectTitle String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  exam    Exam    @relation(fields: [examId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, subjectId])
+}
+
+model Stream {
+  id             String          @id @default(cuid()) @map("_id")
+  title          String
+  slug           String          @unique
+  classId        String // Foreign key to Class
+  class          Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  students       Student[]
+  schoolId       String // Foreign key to School
+  school         School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  attendanceLogs AttendanceLog[]
+
+  @@map("streams")
+}
+
+enum UserRoleSchool {
+  SUPER_ADMIN
+  ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+  SECRETARY
+  LIBRARIAN
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid()) @map("_id")
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Parent {
+  id String @id @default(cuid()) @map("_id")
+
+  // One-to-One relationship with User
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  title              String
+  firstName          String
+  lastName           String
+  relationship       String
+  email              String             @unique
+  NIN                String             @unique // National Insurance Number
+  gender             String
+  dob                DateTime
+  phone              String             @unique
+  nationality        String
+  whatsapNo          String?
+  imageUrl           String?
+  contactMethod      String
+  occupation         String
+  address            String
+  password           String
+  students           Student[]
+  schoolId           String // Foreign key to School
+  schoolName         String // Foreign key to School
+  school             School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolFeesPayments SchoolFeePayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("parents")
+}
+
+model Student {
+  id                 String             @id @default(cuid()) @map("_id")
+  // One-to-One relationship with User
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String             @unique
+  schoolFeesPayments SchoolFeePayment[]
+  name               String
+  firstName          String
+  lastName           String
+  email              String             @unique
+  parentId           String
+  classId            String
+  studentType        String?            @default("PS")
+  streamId           String
+  password           String
+  imageUrl           String?
+  phone              String?
+  parentName         String?
+  classTitle         String?
+  streamTitle        String?
+  state              String
+  BCN                String             @unique // Birth Certificate Number
+  nationality        String
+  religion           String
+  gender             String
+  dob                DateTime
+  rollNo             String             @unique
+  regNo              String             @unique // Registration Number
+  admissionDate      DateTime
+  address            String
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  schoolId           String // Foreign key to School
+  schoolName         String
+  school             School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  // Relationships
+  parent             Parent             @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  class              Class              @relation(fields: [classId], references: [id], onDelete: Cascade)
+  stream             Stream             @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  guardian           GuardianInfo?      @relation("StudentToGuardianInfo")
+  documents          StudentDocument[]
+  studentMarks       StudentMark[]
+  attendance         Attendance[]
+
+  @@map("students")
+}
+
+model GuardianInfo {
+  id        String  @id @default(cuid()) @map("_id")
+  // Link to student
+  studentId String  @unique
+  student   Student @relation("StudentToGuardianInfo", fields: [studentId], references: [id])
+
+  // Father's Details
+  fatherFullName      String
+  fatherOccupation    String
+  fatherPhoneNumber   String
+  fatherEmail         String
+  fatherOfficeAddress String
+  isPrimaryGuardian   Boolean @default(true)
+
+  // Mother's Details
+  motherFullName      String
+  motherOccupation    String
+  motherPhoneNumber   String
+  motherEmail         String
+  motherOfficeAddress String
+  isSecondaryGuardian Boolean @default(true)
+
+  // Emergency Contact
+  emergencyContactName     String
+  emergencyContactRelation String
+  emergencyContactNumber   String
+  isLocalGuardian          Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Teacher {
+  id        String   @id @default(cuid()) @map("_id")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // One-to-One relationship with User
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  // assignedClass  Class?     @relation("ClassTeacher")
+
+  assignedClasses Class[]      @relation("ClassTeacher") // One-to-many
+  isClassTeacher  Boolean      @default(false)
+  // Personal Information
+  title           String
+  firstName       String
+  lastName        String
+  email           String       @unique
+  phone           String       @unique
+  whatsappNo      String?
+  dateOfBirth     DateTime?
+  gender          GenderSchool
+  imageUrl        String? // URL for profile picture
+  NIN             String       @unique
+  // Authentication
+  password        String? // Hashed password
+  isActive        Boolean      @default(true)
+  lastLogin       DateTime?
+  contactMethod   String
+  // Professional Information
+  employeeId      String       @unique // School-specific ID
+  dateOfJoining   DateTime
+  designation     String // e.g., "Senior Teacher", "Head of Department"
+  departmentName  String
+  department      Department   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId    String
+
+  mainSubject   String? // Main subject expertise
+  mainSubjectId String? // Main subject expertise
+  qualification String // Highest education qualification
+
+  // Teaching Details
+  classes         String[] // Classes they're responsible for
+  classIds        String[] // Classes they're responsible for
+  subjects        Subject[]
+  subjectsSummary String[]
+  // Documents
+  documents       TeacherDocument[]
+  // Contact Information
+  address         String?
+  nationality     String
+
+  // Emergency Contact
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  emergencyContactRelation String?
+
+  // Additional Information
+  experience  Int? // Years of experience
+  bio         String?
+  skills      String? // Comma-separated list of skills
+  socialLinks Json? // Store social media links as JSON
+
+  // School Relationship
+  school     School @relation(fields: [schoolId], references: [id])
+  schoolId   String
+  schoolName String
+
+  // Attendance & Leave
+  attendance TeacherAttendance[]
+  leaves     TeacherLeave[]
+
+  @@map("teachers")
+}
+
+model Department {
+  id        String   @id @default(cuid()) @map("_id")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Basic Information
+  name String
+  slug String @unique
+
+  // School Relationship
+  school       School    @relation(fields: [schoolId], references: [id])
+  schoolId     String
+  // Head of Department
+  hodId        String? // Current HOD
+  hodName      String? // Current HOD
+  hodStartDate DateTime? // When current HOD started
+  // Members
+  teachers     Teacher[]
+
+  // Academic Information (if academic department)
+  subjects   Subject[]
+  // Financial Information
+  budget     Float? // Annual budget
+  budgetYear String? // Fiscal year
+
+  @@map("departments")
+}
+
+model Subject {
+  id        String   @id @default(cuid()) @map("_id")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Basic Information
+  name      String
+  slug      String  @unique
+  code      String
+  shortName String?
+
+  // Academic Details
+  category       SubjectCategory
+  type           SubjectType
+  passingMarks   Int?
+  totalMarks     Int?
+  department     Department      @relation(fields: [departmentId], references: [id])
+  departmentId   String
+  departmentName String
+
+  // School Relationship
+  school      School   @relation(fields: [schoolId], references: [id])
+  schoolId    String   @default("cm4kub0c40000o0bbt3xgzo5s")
+  // Teacher Assignment for this subject in this class
+  teacher     Teacher? @relation(fields: [teacherId], references: [id])
+  teacherId   String?
+  teacherName String?
+
+  // Additional Settings
+  isActive     Boolean @default(true)
+  isOptional   Boolean @default(false)
+  hasTheory    Boolean @default(true)
+  hasPractical Boolean @default(false)
+
+  // If practical
+  labRequired    Boolean         @default(false)
+  // Relationships
+  examSubjects   ExamSubject[]
+  studentMarks   StudentMark[]
+  marksheets     Marksheet[]
+  attendanceLogs AttendanceLog[]
+
+  @@map("subjects")
+}
+
+enum SubjectCategory {
+  CORE
+  ELECTIVE
+  ADDITIONAL
+  VOCATIONAL
+  LANGUAGE
+  EXTRA_CURRICULAR
+}
+
+enum SubjectType {
+  THEORY
+  PRACTICAL
+  BOTH
+}
+
+model TeacherDocument {
+  id        String  @id @default(cuid()) @map("_id")
+  teacher   Teacher @relation(fields: [teacherId], references: [id])
+  teacherId String
+
+  type       DocumentType
+  title      String
+  url        String
+  uploadedAt DateTime     @default(now())
+
+  @@index([teacherId])
+  @@map("teacherDocuments")
+}
+
+model TeacherAttendance {
+  id        String  @id @default(cuid()) @map("_id")
+  teacher   Teacher @relation(fields: [teacherId], references: [id])
+  teacherId String
+
+  date     DateTime
+  status   AttendanceStatus
+  checkIn  DateTime?
+  checkOut DateTime?
+  note     String?
+
+  @@unique([teacherId, date])
+  @@map("teacherAttendances")
+}
+
+model TeacherLeave {
+  id        String  @id @default(cuid()) @map("_id")
+  teacher   Teacher @relation(fields: [teacherId], references: [id])
+  teacherId String
+
+  startDate  DateTime
+  endDate    DateTime
+  type       LeaveType
+  reason     String
+  status     LeaveStatus @default(PENDING)
+  approvedBy String? // ID of admin who approved/rejected
+  approvedAt DateTime?
+
+  @@index([teacherId])
+  @@map("teacherLeaves")
+}
+
+// Enums
+
+enum GenderSchool {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum DocumentType {
+  RESUME
+  CERTIFICATE
+  ID_PROOF
+  QUALIFICATION
+  CONTRACT
+  OTHER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  ON_LEAVE
+}
+
+enum LeaveType {
+  SICK
+  CASUAL
+  VACATION
+  MATERNITY
+  PATERNITY
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model Period {
+  id                 String             @id @default(cuid()) @map("_id")
+  year               Int
+  term               Int
+  startDate          DateTime
+  endDate            DateTime
+  isActive           Boolean            @default(false)
+  // School Relationship
+  school             School             @relation(fields: [schoolId], references: [id])
+  schoolId           String
+  schoolFees         SchoolFee[]
+  marksheets         Marksheet[]
+  studentMarks       StudentMark[]
+  schoolFeesPayments SchoolFeePayment[]
+
+  @@unique([year, term])
+  @@map("periods")
+}
+
+model SchoolFee {
+  id                 String             @id @default(cuid()) @map("_id")
+  term               String
+  year               Int
+  title              String
+  className          String
+  schoolName         String
+  fees               Fee[]
+  schoolFeesPayments SchoolFeePayment[]
+  // School Relationship
+  school             School             @relation(fields: [schoolId], references: [id])
+  schoolId           String
+  class              Class              @relation(fields: [classId], references: [id])
+  classId            String
+  period             Period             @relation(fields: [periodId], references: [id])
+  periodId           String
+
+  @@map("school-fees")
+}
+
+model Fee {
+  id          String    @id @default(cuid()) @map("_id")
+  title       String
+  amount      Int
+  schoolFee   SchoolFee @relation(fields: [schoolFeeId], references: [id])
+  schoolFeeId String
+  feeStatus   FeeStatus @default(NOT_PAID)
+  paymentDate DateTime?
+
+  @@map("fees")
+}
+
+model SchoolFeePayment {
+  id               String              @id @default(cuid()) @map("_id")
+  schoolName       String
+  // School Relationship
+  school           School              @relation(fields: [schoolId], references: [id])
+  schoolId         String
+  period           Period              @relation(fields: [periodId], references: [id])
+  periodId         String
+  schoolFee        SchoolFee           @relation(fields: [schoolFeeId], references: [id])
+  schoolFeeId      String
+  student          Student             @relation(fields: [studentProfileId], references: [id])
+  parent           Parent              @relation(fields: [parentProfileId], references: [id])
+  studentProfileId String
+  studentUserId    String
+  studentName      String
+  parentName       String
+  parentProfileId  String
+  parentUserId     String
+  schoolFeeTitle   String
+  paidFeeAmount    Int
+  paidFees         String[]
+  PRN              String
+  paymentStatus    PaymentStatusSchool @default(PENDING)
+  term             String
+  year             Int
+  className        String
+  // Timestamps
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @default(now()) @updatedAt
+
+  @@map("school-fees-payments")
+}
+
+enum PaymentStatusSchool {
+  PENDING
+  APPROVED
+  FAILED
+}
+
+enum FeeStatus {
+  PAID
+  NOT_PAID
+}
+
+model UserLog {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String
+  activity  String
+  time      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  device    String?
+  school    School   @relation(fields: [schoolId], references: [id])
+  schoolId  String
+}
+
+model Reminder {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String?
+  email     String?
+  message   String
+  subject   String
+  recipient Key
+  from      From     @default(Administration)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school   School @relation(fields: [schoolId], references: [id])
+  schoolId String
+}
+
+enum Key {
+  Parents
+  Students
+  Teachers
+  All
+}
+
+enum From {
+  Administration
+  Parent
+  Student
+  Teacher
+}
+
+model StudentDocument {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String
+  type      String
+  url       String
+  size      Int
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StudentMark {
+  id        String   @id @default(cuid()) @map("_id")
+  examId    String
+  studentId String
+  subjectId String
+  termId    String
+  marks     Float?
+  isAbsent  Boolean  @default(false)
+  comments  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  classId   String?
+  class     Class?   @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  // Relationships
+  exam        Exam       @relation(fields: [examId], references: [id])
+  student     Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject     Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  term        Period     @relation(fields: [termId], references: [id])
+  marksheet   Marksheet? @relation(fields: [marksheetId], references: [id], onDelete: Cascade)
+  marksheetId String?
+}
+
+enum ExamType {
+  REGULAR
+  MOCK
+  PLACEMENT
+}
+
+model Exam {
+  id           String       @id @default(cuid()) @map("_id")
+  title        String
+  examType     ExamType     @default(REGULAR)
+  termName     Int          @default(1)
+  academicYear String
+  startDate    DateTime
+  duration     Int // in minutes
+  passingMark  Float        @default(50)
+  totalMarks   Float        @default(100)
+  weightage    Float        @default(100) // percentage contribution to final grade
+  // School Relationship
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId     String
+  examCategory ExamCategory @default(TERM_START)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relationships
+  examClasses  ExamClass[]
+  examSubjects ExamSubject[]
+  studentMarks StudentMark[]
+  marksheets   Marksheet[]
+}
+
+model Marksheet {
+  id        String          @id @default(cuid()) @map("_id")
+  title     String?         @default("Default Marksheet")
+  examId    String
+  classId   String
+  subjectId String
+  termId    String
+  status    MarksheetStatus @default(PUBLISHED)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  // Relationships
+  exam    Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  class   Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  term    Period        @relation(fields: [termId], references: [id], onDelete: Cascade)
+  marks   StudentMark[]
+}
+
+enum MarksheetStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ExamCategory {
+  TERM_START
+  MID_TERM
+  END_TERM
+}
+
+model Section {
+  id         String      @id @default(cuid()) @map("_id")
+  schoolId   String
+  type       SectionType
+  isComplete Boolean     @default(false)
+  title      String
+  subtitle   String?
+  isActive   Boolean     @default(true)
+  order      Int
+  settings   Json // Stores section-specific settings as JSON
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  // Relationships
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, type])
+}
+
+model NewsItem {
+  id        String   @id @default(cuid()) @map("_id")
+  schoolId  String
+  title     String
+  slug      String
+  content   String
+  image     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, slug])
+}
+
+enum SectionType {
+  LOGO_NAVIGATION
+  HERO
+  ABOUT
+  HEADMASTER_QUOTE
+  ADMISSION
+  NEWS
+  EVENTS
+  GALLERY
+  CONTACT
+  FOOTER
+}
+
+model RecentActivity {
+  id          String   @id @default(cuid()) @map("_id")
+  activity    String
+  type        String   @default("site")
+  description String
+  time        String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  school      School   @relation(fields: [schoolId], references: [id])
+  schoolId    String
+}
+
+model Event {
+  id          String   @id @default(cuid()) @map("_id")
+  schoolId    String
+  title       String
+  description String
+  image       String
+  date        DateTime
+  startTime   String
+  endTime     String
+  location    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model GalleryImage {
+  id          String           @id @default(cuid()) @map("_id")
+  schoolId    String
+  title       String
+  description String?
+  image       String
+  date        String?
+  categoryId  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  active      Boolean          @default(true)
+  // Relationships
+  school      School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  category    GalleryCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, categoryId])
+}
+
+model GalleryCategory {
+  id       String         @id @default(cuid()) @map("_id")
+  schoolId String
+  name     String
+  order    Int            @unique
+  active   Boolean        @default(true)
+  // Relationships
+  school   School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  images   GalleryImage[]
+
+  @@unique([schoolId, name])
+}
+
+model SchoolContactMessage {
+  id        String   @id @default(cuid()) @map("_id")
+  fullName  String
+  email     String   @unique
+  phone     String
+  message   String
+  subject   String
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("school-contact-messages")
+}
+
+model AttendanceLog {
+  id          String       @id @default(cuid()) @map("_id")
+  date        DateTime
+  startTime   String
+  endTime     String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  // Relations
+  class       Class        @relation(fields: [classId], references: [id])
+  classId     String
+  className   String
+  streamName  String
+  stream      Stream       @relation(fields: [streamId], references: [id])
+  streamId    String
+  subject     Subject      @relation(fields: [subjectId], references: [id])
+  subjectId   String
+  subjectName String
+  school      School       @relation(fields: [schoolId], references: [id])
+  schoolId    String
+  records     Attendance[]
+}
+
+model Attendance {
+  id              String                  @id @default(cuid()) @map("_id")
+  status          StudentAttendanceStatus
+  note            String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  // Relations
+  studentId       String
+  studentName     String
+  studentRegNo    String
+  attendanceLog   AttendanceLog           @relation(fields: [attendanceLogId], references: [id])
+  attendanceLogId String
+  student         Student                 @relation(fields: [studentId], references: [id])
+}
+
+enum StudentAttendanceStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
+//School Management Finish
+
+
+
+
+//Real Estate ERP
+
+enum UserRoleGayrimenkul {
+  SUPER_ADMIN
+  ADMIN
+  AGENT // Emlak danışmanı
+  CLIENT // Müşteri (alıcı / kiracı / satıcı)
+  SECRETARY
+  ACCOUNTANT
+  USER
+}
+
+enum GayrimenkulGender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum PropertyType {
+  APARTMENT // Daire
+  HOUSE // Müstakil ev
+  VILLA
+  OFFICE // Ofis
+  SHOP // Dükkan
+  LAND // Arsa
+  WAREHOUSE // Depo
+  BUILDING // Bina / Apartman
+}
+
+enum ListingType {
+  SALE // Satılık
+  RENT // Kiralık
+  SHORT_RENT // Kısa dönem kiralık
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  RENTED
+  WITHDRAWN // Geri çekildi
+  PENDING // Beklemede
+  RESERVED // Rezerve edildi
+}
+
+enum PropertyStatus {
+  AVAILABLE // Müsait
+  SOLD
+  RENTED
+  UNDER_CONTRACT // Sözleşme sürecinde
+  UNDER_MAINTENANCE // Bakımda
+}
+
+enum ContractType {
+  SALE
+  RENTAL
+  PRE_SALE // Ön satış / Satış vaadi
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatusGayrimenkul {
+  PENDING
+  PAID
+  PARTIAL
+  FAILED
+  REFUNDED
+}
+
+enum DocumentTypeGayrimenkul {
+  DEED // Tapu
+  CONTRACT // Sözleşme
+  INSPECTION // Ekspertiz raporu
+  FLOOR_PLAN // Kat planı / Vaziyet planı
+  PHOTO // Fotoğraf
+  ENERGY_CERT // Enerji kimlik belgesi
+  ID_PROOF // Kimlik belgesi
+  POWER_OF_ATTORNEY // Vekaletname
+  OTHER
+}
+
+enum LeaveTypeGayrimenkul {
+  SICK
+  CASUAL
+  VACATION
+  OTHER
+}
+
+enum LeaveStatusGayrimenkul {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceStatusGayrimenkul {
+  PRESENT
+  ABSENT
+  LATE
+  ON_LEAVE
+  REMOTE
+}
+
+enum VisitStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ReminderRecipientGayrimenkul {
+  Clients
+  Agents
+  All
+  Management
+}
+
+enum ReminderFromGayrimenkul {
+  Management
+  Agent
+  Client
+}
+
+enum SectionTypeGayrimenkul {
+  LOGO_NAVIGATION
+  HERO
+  ABOUT
+  FEATURED_PROPERTIES
+  SERVICES
+  TESTIMONIALS
+  TEAM
+  CONTACT
+  FOOTER
+}
+
+// Agency → School karşılığı (Emlak ofisi / şirketi)
+model Agency {
+  id           String  @id @default(cuid()) @map("_id")
+  name         String
+  logo         String?
+  primaryEmail String?
+  slug         String  @unique
+  phone        String?
+  address      String?
+  city         String?
+  taxNumber    String? // Vergi numarası
+  licenseNo    String? // Ticaret ruhsatı
+
+  ownerUserId String? // Ofisi oluşturan/sahibi kullanıcı (çoklu ofis + geçiş için)
+
+  siteEnabled    Boolean @default(false)
+  siteCompletion Int     @default(0)
+
+  users             User[]
+  agencyLogs        AgencyLog[]
+  galleryImages     AgencyGalleryImage[]
+  galleryCategories AgencyGalleryCategory[]
+  events            AgencyEvent[]
+  recentActivities  AgencyActivity[]
+  reminders         AgencyReminder[]
+  departments       AgencyDepartment[]
+  agents            Agent[]
+  clients           PropertyClient[]
+  properties        PropertyRealEstate[]
+  listings          Listing[]
+  contracts         PropertyContract[]
+  newsItems         AgencyNewsItem[]
+  sections          AgencySection[]
+  contactMessages   AgencyContactMessage[]
+
+  // CRM
+  crmPipelines  CrmPipeline[]
+  crmLeads      Lead[]
+  crmTasks      CrmTask[]
+  crmActivities CrmActivity[]
+
+  // Proje Yönetimi
+  estateProjects EstateProject[]
+
+  // Gelişmiş ERP (teklif, muhasebe, kira, iletişim)
+  offers              PropertyOffer[]
+  reservations        PropertyReservation[]
+  commissions         Commission[]
+  invoices2           AgencyInvoice[]
+  expenses            AgencyExpense[]
+  payrolls            AgentPayroll[]
+  maintenanceRequests MaintenanceRequest[]
+  communicationLogs   CommunicationLog[]
+  notifications       AgencyNotification[]
+  auditLogs           AgencyAuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerUserId])
+  @@map("agencies")
+}
+
+// AgencyDepartment → Department karşılığı
+model AgencyDepartment {
+  id   String @id @default(cuid()) @map("_id")
+  name String
+  slug String @unique
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
+
+  managerId        String?
+  managerName      String?
+  managerStartDate DateTime?
+  budget           Float?
+  budgetYear       String?
+
+  agents Agent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("agency-departments")
+}
+
+// Agent → Teacher karşılığı (Emlak danışmanı / broker)
+model Agent {
+  id String @id @default(cuid()) @map("_id")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  title         String
+  firstName     String
+  lastName      String
+  email         String            @unique
+  phone         String            @unique
+  whatsappNo    String?
+  dateOfBirth   DateTime?
+  gender        GayrimenkulGender
+  imageUrl      String?
+  NIN           String            @unique // TC Kimlik No
+  password      String?
+  isActive      Boolean           @default(true)
+  lastLogin     DateTime?
+  contactMethod String
+
+  employeeId     String           @unique
+  dateOfJoining  DateTime
+  designation    String // "Kıdemli Danışman", "Şube Müdürü" vb.
+  departmentName String
+  department     AgencyDepartment @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId   String
+  licenseNo      String? // Emlak danışmanlığı belgesi no
+  qualification  String
+  experience     Int?
+  bio            String?
+  skills         String?
+  socialLinks    Json?
+  commissionRate Float?           @default(2.5) // Komisyon oranı (%)
+
+  specializationTypes  PropertyType[]
+  specializationCities String[]
+
+  agency     Agency @relation(fields: [agencyId], references: [id])
+  agencyId   String
+  agencyName String
+
+  listings   Listing[]
+  contracts  PropertyContract[]
+  documents  AgentDocument[]
+  attendance AgentAttendance[]
+  leaves     AgentLeave[]
+  visits     PropertyVisit[]
+
+  // CRM
+  crmLeads      Lead[]
+  crmTasks      CrmTask[]
+  crmActivities CrmActivity[]
+
+  // Gelişmiş ERP
+  offers              PropertyOffer[]
+  reservations        PropertyReservation[]
+  commissions         Commission[]
+  expenses            AgencyExpense[]
+  payrolls            AgentPayroll[]
+  maintenanceRequests MaintenanceRequest[]
+  communicationLogs   CommunicationLog[]
+  notifications       AgencyNotification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([departmentId])
+  @@map("agents")
+}
+
+// PropertyClient → Parent + Student karşılığı (Müşteri: alıcı / kiracı / satıcı)
+model PropertyClient {
+  id String @id @default(cuid()) @map("_id")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+
+  title         String
+  firstName     String
+  lastName      String
+  email         String   @unique
+  phone         String   @unique
+  whatsappNo    String?
+  gender        String
+  dob           DateTime
+  nationality   String
+  imageUrl      String?
+  NIN           String   @unique // TC Kimlik No
+  contactMethod String
+  occupation    String?
+  address       String
+  password      String
+
+  isBuyer    Boolean @default(true) // Alıcı
+  isSeller   Boolean @default(false) // Satıcı
+  isTenant   Boolean @default(false) // Kiracı
+  isLandlord Boolean @default(false) // Kiraya veren / mülk sahibi
+
+  minBudget              Float?
+  maxBudget              Float?
+  currency               String         @default("TRY")
+  preferredPropertyTypes PropertyType[]
+  preferredCities        String[]
+  notes                  String?
+
+  agencyId   String
+  agencyName String
+  agency     Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  contracts     PropertyContract[]
+  visits        PropertyVisit[]
+  interests     ClientInterest[]
+  savedSearches ClientSavedSearch[]
+
+  // CRM
+  crmLeads Lead[]
+
+  // Gelişmiş ERP
+  ownedProperties     PropertyRealEstate[]  @relation("PropertyOwner")
+  offers              PropertyOffer[]
+  reservations        PropertyReservation[]
+  invoices2           AgencyInvoice[]
+  maintenanceRequests MaintenanceRequest[]
+  communicationLogs   CommunicationLog[]
+  notifications       AgencyNotification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@map("property-clients")
+}
+
+// Property → Class + Subject karşılığı (Mülk)
+model PropertyRealEstate {
+  id    String @id @default(cuid()) @map("_id")
+  title String
+  slug  String @unique
+
+  address      String
+  city         String
+  district     String // İlçe
+  neighborhood String? // Mahalle
+  zipCode      String?
+  latitude     Float?
+  longitude    Float?
+
+  propertyType  PropertyType
+  status        PropertyStatus @default(AVAILABLE)
+  grossArea     Float? // Brüt alan (m²)
+  netArea       Float? // Net alan (m²)
+  roomCount     String? // "3+1", "2+1" vb.
+  bathroomCount Int?
+  floorNo       Int?
+  totalFloors   Int?
+  buildingAge   Int? // Bina yaşı (yıl)
+  heatingType   String?
+  hasElevator   Boolean        @default(false)
+  hasParking    Boolean        @default(false)
+  isFurnished   Boolean        @default(false)
+  hasGarden     Boolean        @default(false)
+  hasPool       Boolean        @default(false)
+  hasBalcony    Boolean        @default(false)
+  isFeatured    Boolean        @default(false)
+  description   String?
+  notes         String?
+
+  // Mülk sahibi: kayıtlı müşteriye (satıcı/mülk sahibi) bağlanabilir.
+  // ownerName/ownerPhone/ownerNIN, ownerId yoksa veya snapshot için tutulur.
+  ownerId    String?
+  owner      PropertyClient? @relation("PropertyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerName  String?
+  ownerPhone String?
+  ownerNIN   String? // TC Kimlik No
+
+  price    Float?
+  currency String @default("TRY")
+
+  agencyId   String
+  agencyName String
+  agency     Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  listings            Listing[]
+  documents           PropertyDocument[]
+  images              PropertyImage[]
+  visits              PropertyVisit[]
+  contracts           PropertyContract[]
+  offers              PropertyOffer[]
+  reservations        PropertyReservation[]
+  maintenanceRequests MaintenanceRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([propertyType])
+  @@index([city])
+  @@map("properties")
+}
+
+// Listing → Exam karşılığı (İlan)
+// İlan kanalı: ofis (AGENCY) mi yoksa bireysel sahibinden (INDIVIDUAL) mı
+enum ListingChannel {
+  AGENCY
+  INDIVIDUAL
+}
+
+// İlan moderasyon durumu (özellikle bireysel ilanlar için onay kuyruğu)
+enum ListingModeration {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Ziyaretçinin favorilediği ilan (pazar yeri hesabı = User)
+model MarketFavorite {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@map("market-favorites")
+}
+
+// Ziyaretçinin kaydettiği arama kriterleri
+model MarketSavedSearch {
+  id           String   @id @default(cuid()) @map("_id")
+  userId       String
+  name         String
+  listingType  String?
+  propertyType String?
+  city         String?
+  minPrice     Float?
+  maxPrice     Float?
+  rooms        String?
+  q            String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@map("market-saved-searches")
+}
+
+model Listing {
+  id        String @id @default(cuid()) @map("_id")
+  title     String
+  listingNo String @unique // İlan numarası
+
+  listingType ListingType
+  status      ListingStatus @default(ACTIVE)
+
+  // Pazar yeri: bireysel (sahibinden) ilanlar için kanal + ilan sahibi kullanıcı
+  channel          ListingChannel    @default(AGENCY)
+  ownerUserId      String? // INDIVIDUAL ilanlarda ilanı veren User
+  moderationStatus ListingModeration @default(APPROVED) // bireysel ilanlar PENDING başlar
+  featuredUntil    DateTime? // ücretli öne çıkarma bitiş tarihi
+  videoUrl         String? // tanıtım videosu
+  virtualTourUrl   String? // 360° sanal tur linki
+
+  askingPrice  Float
+  currency     String  @default("TRY")
+  monthlyRent  Float? // Aylık kira (kiralık ilanlar için)
+  deposit      Float? // Depozito
+  isNegotiable Boolean @default(true)
+
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  isPublic    Boolean   @default(true)
+  views       Int       @default(0)
+  description String?
+  highlights  String[]
+
+  propertyId String
+  property   PropertyRealEstate @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  agentId   String?
+  agentName String
+  agent     Agent?  @relation(fields: [agentId], references: [id])
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
+
+  contracts PropertyContract[]
+  visits    PropertyVisit[]
+  interests ClientInterest[]
+
+  // CRM
+  crmLeads Lead[]
+
+  // Gelişmiş ERP
+  offers            PropertyOffer[]
+  reservations      PropertyReservation[]
+  communicationLogs CommunicationLog[]
+
+  // Pazar yeri
+  favorites MarketFavorite[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([propertyId])
+  @@index([agentId])
+  @@index([status])
+  @@index([listingType])
+  @@index([ownerUserId])
+  @@map("listings")
+}
+
+// PropertyContract → Marksheet + SchoolFeePayment karşılığı (Sözleşme)
+
+model PropertyContract {
+  id         String @id @default(cuid()) @map("_id")
+  contractNo String @unique
+
+  contractType ContractType
+  status       ContractStatus @default(DRAFT)
+
+  startDate  DateTime
+  endDate    DateTime? // Kiralık sözleşmeler için bitiş tarihi
+  signedDate DateTime?
+
+  salePrice   Float?
+  rentalPrice Float?
+  deposit     Float?
+  commission  Float?
+  currency    String  @default("TRY")
+  notes       String?
+
+  // Kira yönetimi (kiralık sözleşmeler için)
+  rentIncreaseRate Float? // Yıllık kira artış oranı (%)
+  rentPaymentDay   Int? // Ayın kaçında kira ödenecek (1-31)
+  nextRentDueDate  DateTime? // Bir sonraki kira tahakkuk tarihi
+  autoRenew        Boolean   @default(false) // Otomatik yenileme
+
+  propertyId String
+  property   PropertyRealEstate @relation(fields: [propertyId], references: [id])
+
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id])
+
+  agentId   String
+  agentName String
+  agent     Agent  @relation(fields: [agentId], references: [id])
+
+  clientId   String
+  clientName String
+  client     PropertyClient @relation(fields: [clientId], references: [id])
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
+
+  payments  ContractPayment[]
+  documents ContractDocument[]
+
+  // Gelişmiş ERP
+  commissions         Commission[]
+  invoices2           AgencyInvoice[]
+  maintenanceRequests MaintenanceRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([propertyId])
+  @@index([agentId])
+  @@index([clientId])
+  @@index([status])
+  @@map("property-contracts")
+}
+
+// ContractPayment → Fee + SchoolFee karşılığı (Ödeme planı)
+model ContractPayment {
+  id String @id @default(cuid()) @map("_id")
+
+  contractId String
+  contract   PropertyContract @relation(fields: [contractId], references: [id])
+
+  title         String // "Peşinat", "1. Taksit", "Kira - Ocak 2025"
+  amount        Float
+  dueDate       DateTime
+  paidDate      DateTime?
+  status        PaymentStatusGayrimenkul @default(PENDING)
+  paymentMethod String? // "Nakit", "EFT/Havale", "Çek"
+  receiptNo     String?
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([contractId])
+  @@index([status])
+  @@map("contract-payments")
+}
+
+// PropertyVisit → AttendanceLog + Attendance karşılığı (Mülk gezisi / randevu)
+model PropertyVisit {
+  id String @id @default(cuid()) @map("_id")
+
+  scheduledAt DateTime
+  completedAt DateTime?
+  status      VisitStatus @default(SCHEDULED)
+  notes       String?
+  feedback    String?
+  rating      Int? // 1-5 memnuniyet puanı
+
+  propertyId String
+  property   PropertyRealEstate @relation(fields: [propertyId], references: [id])
+
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id])
+
+  agentId String
+  agent   Agent  @relation(fields: [agentId], references: [id])
+
+  clientId String
+  client   PropertyClient @relation(fields: [clientId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([propertyId])
+  @@index([agentId])
+  @@index([clientId])
+  @@index([status])
+  @@map("property-visits")
+}
+
+// ClientInterest → Müşterinin ilgilendiği / favorilediği ilanlar
+model ClientInterest {
+  id String @id @default(cuid()) @map("_id")
+
+  clientId String
+  client   PropertyClient @relation(fields: [clientId], references: [id])
+
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+
+  notes    String?
+  priority String? // "HIGH", "MEDIUM", "LOW"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clientId, listingId])
+  @@index([clientId])
+  @@index([listingId])
+  @@map("client-interests")
+}
+
+// Müşterinin kaydettiği arama kriterleri (yeni uygun ilan bildirimi için)
+model ClientSavedSearch {
+  id String @id @default(cuid()) @map("_id")
+
+  clientId String
+  client   PropertyClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  name         String
+  listingType  String? // SALE | RENT | SHORT_RENT
+  propertyType String?
+  city         String?
+  minPrice     Float?
+  maxPrice     Float?
+  q            String?
+
+  // Bu zamandan sonra eklenen eşleşmeler "yeni" sayılır
+  lastSeenAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("client-saved-searches")
+}
+
+// ===== DÖKÜMANLAR =====
+
+model PropertyDocument {
+  id String @id @default(cuid()) @map("_id")
+
+  propertyId String
+  property   PropertyRealEstate @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  type       DocumentTypeGayrimenkul
+  title      String
+  url        String
+  size       Int?
+  uploadedAt DateTime                @default(now())
+
+  @@index([propertyId])
+  @@map("property-documents")
+}
+
+model ContractDocument {
+  id String @id @default(cuid()) @map("_id")
+
+  contractId String
+  contract   PropertyContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  type       DocumentTypeGayrimenkul
+  title      String
+  url        String
+  size       Int?
+  uploadedAt DateTime                @default(now())
+
+  @@index([contractId])
+  @@map("contract-documents")
+}
+
+// AgentDocument → TeacherDocument karşılığı
+model AgentDocument {
+  id String @id @default(cuid()) @map("_id")
+
+  agentId String
+  agent   Agent  @relation(fields: [agentId], references: [id])
+
+  type       DocumentTypeGayrimenkul
+  title      String
+  url        String
+  uploadedAt DateTime                @default(now())
+
+  @@index([agentId])
+  @@map("agent-documents")
+}
+
+model PropertyImage {
+  id String @id @default(cuid()) @map("_id")
+
+  propertyId String
+  property   PropertyRealEstate @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  url     String
+  title   String?
+  isCover Boolean @default(false)
+  order   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([propertyId])
+  @@map("property-images")
+}
+
+// ===== DANIŞMAN YÖNETİMİ =====
+
+// AgentAttendance → TeacherAttendance karşılığı
+model AgentAttendance {
+  id String @id @default(cuid()) @map("_id")
+
+  agentId String
+  agent   Agent  @relation(fields: [agentId], references: [id])
+
+  date     DateTime
+  status   AttendanceStatusGayrimenkul
+  checkIn  DateTime?
+  checkOut DateTime?
+  note     String?
+
+  @@unique([agentId, date])
+  @@map("agent-attendances")
+}
+
+// AgentLeave → TeacherLeave karşılığı
+model AgentLeave {
+  id String @id @default(cuid()) @map("_id")
+
+  agentId String
+  agent   Agent  @relation(fields: [agentId], references: [id])
+
+  startDate  DateTime
+  endDate    DateTime
+  type       LeaveTypeGayrimenkul
+  reason     String
+  status     LeaveStatusGayrimenkul @default(PENDING)
+  approvedBy String?
+  approvedAt DateTime?
+
+  @@index([agentId])
+  @@map("agent-leaves")
+}
+
+// ===== OFİS GENEL YÖNETİM =====
+
+// AgencyLog → UserLog karşılığı
+model AgencyLog {
+  id        String  @id @default(cuid()) @map("_id")
+  name      String
+  activity  String
+  time      String
+  ipAddress String?
+  device    String?
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("agency-logs")
+}
+
+// AgencyActivity → RecentActivity karşılığı
+model AgencyActivity {
+  id          String  @id @default(cuid()) @map("_id")
+  activity    String
+  type        String  @default("site")
+  description String
+  time        String
+  read        Boolean @default(false)
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("agency-activities")
+}
+
+// AgencyReminder → Reminder karşılığı
+model AgencyReminder {
+  id      String  @id @default(cuid()) @map("_id")
+  name    String?
+  email   String?
+  message String
+  subject String
+
+  recipient ReminderRecipientGayrimenkul
+  from      ReminderFromGayrimenkul      @default(Management)
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("agency-reminders")
+}
+
+// AgencyNewsItem → NewsItem karşılığı
+model AgencyNewsItem {
+  id       String @id @default(cuid()) @map("_id")
+  agencyId String
+  title    String
+  slug     String
+  content  String
+  image    String
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([agencyId, slug])
+  @@map("agency-news")
+}
+
+// AgencyEvent → Event karşılığı
+model AgencyEvent {
+  id          String   @id @default(cuid()) @map("_id")
+  agencyId    String
+  title       String
+  description String
+  image       String
+  date        DateTime
+  startTime   String
+  endTime     String
+  location    String
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("agency-events")
+}
+
+// AgencyGalleryImage → GalleryImage karşılığı
+model AgencyGalleryImage {
+  id          String  @id @default(cuid()) @map("_id")
+  agencyId    String
+  title       String
+  description String?
+  image       String
+  date        String?
+  categoryId  String?
+  active      Boolean @default(true)
+
+  agency   Agency                 @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  category AgencyGalleryCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId, categoryId])
+  @@map("agency-gallery-images")
+}
+
+// AgencyGalleryCategory → GalleryCategory karşılığı
+model AgencyGalleryCategory {
+  id       String  @id @default(cuid()) @map("_id")
+  agencyId String
+  name     String
+  order    Int     @unique
+  active   Boolean @default(true)
+
+  agency Agency               @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  images AgencyGalleryImage[]
+
+  @@unique([agencyId, name])
+  @@map("agency-gallery-categories")
+}
+
+// AgencySection → Section karşılığı (Web sitesi bölümleri)
+model AgencySection {
+  id         String                 @id @default(cuid()) @map("_id")
+  agencyId   String
+  type       SectionTypeGayrimenkul
+  isComplete Boolean                @default(false)
+  title      String
+  subtitle   String?
+  isActive   Boolean                @default(true)
+  order      Int
+  settings   Json
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId, type])
+  @@map("agency-sections")
+}
+
+// AgencyContactMessage → SchoolContactMessage karşılığı
+model AgencyContactMessage {
+  id          String  @id @default(cuid()) @map("_id")
+  fullName    String
+  email       String
+  phone       String
+  message     String
+  subject     String
+  companyName String?
+  interest    String?
+
+  agencyId String?
+  agency   Agency? @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("agency-contact-messages")
+}
+
+// ============================================================
+// ===========  GELİŞMİŞ ERP: TEKLİF / PAZARLIK  ==============
+// ============================================================
+
+enum OfferStatus {
+  PENDING // Beklemede
+  COUNTERED // Karşı teklif verildi
+  ACCEPTED // Kabul edildi
+  REJECTED // Reddedildi
+  WITHDRAWN // Geri çekildi
+  EXPIRED // Süresi doldu
+}
+
+// Müşterinin bir ilana verdiği teklif (alım/kiralama pazarlığı)
+model PropertyOffer {
+  id      String @id @default(cuid()) @map("_id")
+  offerNo String @unique
+
+  offerType ListingType // SALE / RENT / SHORT_RENT
+  status    OfferStatus @default(PENDING)
+
+  amount        Float // Teklif tutarı
+  currency      String    @default("TRY")
+  counterAmount Float? // Ofisin/satıcının verdiği karşı teklif
+  depositOffer  Float? // Önerilen kapora / depozito
+  message       String? // Teklif notu
+  validUntil    DateTime? // Teklif geçerlilik süresi
+
+  acceptedAt   DateTime?
+  rejectedAt   DateTime?
+  rejectReason String?
+
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  propertyId String
+  property   PropertyRealEstate @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  clientId   String
+  clientName String
+  client     PropertyClient @relation(fields: [clientId], references: [id])
+
+  agentId   String?
+  agentName String?
+  agent     Agent?  @relation(fields: [agentId], references: [id])
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  reservation PropertyReservation?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([listingId])
+  @@index([clientId])
+  @@index([status])
+  @@map("property-offers")
+}
+
+enum ReservationStatus {
+  ACTIVE // Aktif rezervasyon
+  CONVERTED // Sözleşmeye dönüştü
+  CANCELLED // İptal edildi
+  EXPIRED // Süresi doldu
+  REFUNDED // Kapora iade edildi
+}
+
+// Kabul edilen teklif sonrası kapora ile mülkün rezerve edilmesi
+model PropertyReservation {
+  id            String @id @default(cuid()) @map("_id")
+  reservationNo String @unique
+
+  status        ReservationStatus @default(ACTIVE)
+  depositAmount Float // Alınan kapora
+  currency      String            @default("TRY")
+  reservedUntil DateTime // Rezervasyon bitiş tarihi
+  notes         String?
+  cancelReason  String?
+  refundedAt    DateTime?
+
+  offerId String?        @unique
+  offer   PropertyOffer? @relation(fields: [offerId], references: [id], onDelete: SetNull)
+
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+
+  propertyId String
+  property   PropertyRealEstate @relation(fields: [propertyId], references: [id])
+
+  clientId   String
+  clientName String
+  client     PropertyClient @relation(fields: [clientId], references: [id])
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id])
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([propertyId])
+  @@index([status])
+  @@map("property-reservations")
+}
+
+// ============================================================
+// ============  GELİŞMİŞ ERP: KOMİSYON & MUHASEBE  ===========
+// ============================================================
+
+enum CommissionSide {
+  BUYER // Alıcı tarafı
+  SELLER // Satıcı tarafı
+  TENANT // Kiracı tarafı
+  LANDLORD // Mülk sahibi tarafı
+}
+
+enum CommissionStatus {
+  PENDING // Beklemede
+  INVOICED // Faturalandı
+  PAID // Ödendi
+  PARTIAL // Kısmi ödendi
+  CANCELLED // İptal
+}
+
+// Sözleşme başına danışman komisyonu (taraf bazlı, co-broking destekli)
+model Commission {
+  id String @id @default(cuid()) @map("_id")
+
+  contractId String
+  contract   PropertyContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  agentId   String
+  agentName String
+  agent     Agent  @relation(fields: [agentId], references: [id])
+
+  side       CommissionSide
+  baseAmount Float // Üzerinden hesaplanan tutar (satış/kira bedeli)
+  percentage Float? // Komisyon oranı (%)
+  amount     Float // Komisyon tutarı
+  currency   String           @default("TRY")
+  status     CommissionStatus @default(PENDING)
+  paidAt     DateTime?
+  notes      String?
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([contractId])
+  @@index([agentId])
+  @@index([status])
+  @@map("commissions")
+}
+
+enum InvoiceTypeGayrimenkul {
+  COMMISSION // Komisyon faturası
+  RENT // Kira faturası
+  SERVICE // Hizmet faturası
+  OTHER
+}
+
+enum InvoiceStatusGayrimenkul {
+  DRAFT
+  SENT
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+// Ofisin kestiği fatura (komisyon / kira / hizmet)
+model AgencyInvoice {
+  id        String @id @default(cuid()) @map("_id")
+  invoiceNo String @unique
+
+  type   InvoiceTypeGayrimenkul
+  status InvoiceStatusGayrimenkul @default(DRAFT)
+
+  issueDate DateTime  @default(now())
+  dueDate   DateTime?
+  paidDate  DateTime?
+
+  // Fatura edilen taraf bilgileri (snapshot)
+  billToName    String
+  billToTaxNo   String?
+  billToAddress String?
+  billToEmail   String?
+
+  subtotal  Float
+  taxRate   Float?  @default(20) // KDV (%)
+  taxAmount Float?
+  total     Float
+  currency  String  @default("TRY")
+  notes     String?
+
+  contractId String?
+  contract   PropertyContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  clientId String?
+  client   PropertyClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  items AgencyInvoiceItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([status])
+  @@map("agency-invoices")
+}
+
+model AgencyInvoiceItem {
+  id        String        @id @default(cuid()) @map("_id")
+  invoiceId String
+  invoice   AgencyInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  description String
+  quantity    Float  @default(1)
+  unitPrice   Float
+  amount      Float
+
+  @@index([invoiceId])
+  @@map("agency-invoice-items")
+}
+
+enum ExpenseCategoryGayrimenkul {
+  RENT // Ofis kirası
+  SALARY // Maaş
+  MARKETING // Pazarlama / ilan yayını
+  UTILITIES // Faturalar (elektrik/su/internet)
+  COMMISSION // Danışman komisyonu
+  MAINTENANCE // Bakım/onarım
+  TAX // Vergi
+  OTHER
+}
+
+// Ofis giderleri
+model AgencyExpense {
+  id String @id @default(cuid()) @map("_id")
+
+  category      ExpenseCategoryGayrimenkul
+  title         String
+  amount        Float
+  currency      String                     @default("TRY")
+  date          DateTime                   @default(now())
+  paymentMethod String?
+  receiptUrl    String?
+  vendor        String? // Tedarikçi / ödeme yapılan kişi
+  notes         String?
+
+  agentId String? // Maaş/komisyon gideri ise ilgili danışman
+  agent   Agent?  @relation(fields: [agentId], references: [id])
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([category])
+  @@map("agency-expenses")
+}
+
+enum PayrollStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+// Danışman maaş / prim bordrosu (aylık)
+model AgentPayroll {
+  id String @id @default(cuid()) @map("_id")
+
+  agentId String
+  agent   Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  periodMonth Int // 1-12
+  periodYear  Int
+  baseSalary  Float  @default(0)
+  commission  Float  @default(0) // Döneme ait komisyon toplamı
+  bonus       Float  @default(0)
+  deductions  Float  @default(0)
+  netPay      Float
+  currency    String @default("TRY")
+
+  status PayrollStatus @default(PENDING)
+  paidAt DateTime?
+  notes  String?
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([agentId, periodYear, periodMonth])
+  @@index([agencyId])
+  @@map("agent-payrolls")
+}
+
+// ============================================================
+// ========  GELİŞMİŞ ERP: BAKIM & İLETİŞİM & BİLDİRİM  =======
+// ============================================================
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MaintenanceStatus {
+  OPEN // Açık
+  IN_PROGRESS // İşlemde
+  RESOLVED // Çözüldü
+  CANCELLED // İptal
+}
+
+// Mülk bakım / arıza talebi (özellikle yönetilen kiralık portföy için)
+model MaintenanceRequest {
+  id        String @id @default(cuid()) @map("_id")
+  requestNo String @unique
+
+  title       String
+  description String?
+  priority    MaintenancePriority @default(MEDIUM)
+  status      MaintenanceStatus   @default(OPEN)
+
+  cost        Float?
+  currency    String    @default("TRY")
+  vendor      String? // Usta / tedarikçi
+  scheduledAt DateTime?
+  resolvedAt  DateTime?
+  resolution  String?
+
+  propertyId String
+  property   PropertyRealEstate @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  contractId String?
+  contract   PropertyContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+
+  clientId String? // Talebi açan kiracı
+  client   PropertyClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  agentId String? // Atanan/sorumlu danışman
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([propertyId])
+  @@index([status])
+  @@map("maintenance-requests")
+}
+
+enum CommunicationChannel {
+  CALL // Telefon görüşmesi
+  EMAIL
+  SMS
+  WHATSAPP
+  MEETING // Yüz yüze görüşme
+  NOTE // İç not
+}
+
+enum CommunicationDirection {
+  INBOUND // Gelen
+  OUTBOUND // Giden
+}
+
+// Müşteri ile yapılan tüm iletişim kayıtları (arama, e-posta, WhatsApp...)
+model CommunicationLog {
+  id String @id @default(cuid()) @map("_id")
+
+  channel     CommunicationChannel
+  direction   CommunicationDirection @default(OUTBOUND)
+  subject     String?
+  content     String?
+  occurredAt  DateTime               @default(now())
+  durationSec Int? // Arama süresi (saniye)
+  outcome     String? // Görüşme sonucu
+
+  clientId String?
+  client   PropertyClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  agentId String? // İletişimi yapan danışman
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  listingId String? // İlgili ilan
+  listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([agencyId])
+  @@index([clientId])
+  @@index([agentId])
+  @@map("communication-logs")
+}
+
+enum NotificationTypeGayrimenkul {
+  INFO
+  WARNING
+  SUCCESS
+  REMINDER
+  TASK
+}
+
+// Kullanıcıya özel bildirim (okundu/okunmadı takipli)
+model AgencyNotification {
+  id String @id @default(cuid()) @map("_id")
+
+  type    NotificationTypeGayrimenkul @default(INFO)
+  title   String
+  message String
+  link    String?
+  isRead  Boolean                     @default(false)
+  readAt  DateTime?
+
+  recipientUserId String? // Hedef User id (esnek)
+
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  clientId String?
+  client   PropertyClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([agencyId])
+  @@index([recipientUserId])
+  @@index([isRead])
+  @@map("agency-notifications")
+}
+
+// ============================================================
+// ===============  GELİŞMİŞ ERP: AUDIT TRAIL  ===============
+// ============================================================
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  STATUS_CHANGE
+  OTHER
+}
+
+// Kayıt bazlı değişiklik geçmişi (kim, ne zaman, neyi değiştirdi)
+model AgencyAuditLog {
+  id String @id @default(cuid()) @map("_id")
+
+  action   AuditAction
+  entity   String // Model adı: "PropertyOffer", "AgencyInvoice" vb.
+  entityId String? // Etkilenen kaydın id'si
+  summary  String // İnsan-okur özet
+  changes  Json? // Önce/sonra alan farkları (opsiyonel)
+
+  userId   String? // İşlemi yapan kullanıcı
+  userName String? // Snapshot ad
+  userRole String? // Snapshot rol
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([agencyId])
+  @@index([entity])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("agency-audit-logs")
+}
+
+//Real Estate ERP
+
+
+
+
+// ============================================================
+// ===============  REAL ESTATE CRM (ERP üstü)  ===============
+// ============================================================
+
+enum LeadStatus {
+  OPEN // Açık (hatta aktif)
+  WON // Kazanıldı
+  LOST // Kaybedildi
+}
+
+enum LeadSource {
+  WEBSITE // Web sitesi
+  PORTAL // Sahibinden / Hepsiemlak vb.
+  PHONE // Telefon
+  WALK_IN // Ofise gelen
+  REFERRAL // Tavsiye
+  SOCIAL_MEDIA // Sosyal medya
+  ADVERTISEMENT // Reklam
+  EMAIL_CAMPAIGN // E-posta kampanyası
+  PARTNER // İş ortağı
+  OTHER
+}
+
+enum LeadTemperature {
+  HOT // Sıcak
+  WARM // Ilık
+  COLD // Soğuk
+}
+
+enum CrmTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum CrmTaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum CrmActivityType {
+  NOTE // Not
+  CALL // Telefon görüşmesi
+  EMAIL // E-posta
+  WHATSAPP // WhatsApp
+  MEETING // Toplantı
+  VISIT // Mülk gezisi
+  SMS
+  STAGE_CHANGE // Aşama değişikliği (otomatik)
+  TASK // Görev (otomatik)
+  WON // Kazanıldı (otomatik)
+  LOST // Kaybedildi (otomatik)
+  CREATED // Oluşturuldu (otomatik)
+  FILE // Dosya
+}
+
+// Satış hattı (örn. "Satılık Pipeline", "Kiralık Pipeline")
+model CrmPipeline {
+  id          String       @id @default(cuid()) @map("_id")
+  name        String
+  description String?
+  listingType ListingType? // Bu hat hangi ilan türü için (opsiyonel)
+  color       String       @default("#6366f1")
+  isDefault   Boolean      @default(false)
+  isActive    Boolean      @default(true)
+  order       Int          @default(0)
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  stages CrmStage[]
+  leads  Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@map("crm-pipelines")
+}
+
+// Hat aşaması (örn. "Yeni", "İletişim Kuruldu", "Teklif", "Pazarlık")
+model CrmStage {
+  id          String  @id @default(cuid()) @map("_id")
+  name        String
+  color       String  @default("#94a3b8")
+  order       Int     @default(0)
+  probability Int     @default(0) // Kazanma olasılığı (%)
+  isWon       Boolean @default(false)
+  isLost      Boolean @default(false)
+  rottenDays  Int? // Bu kadar gün hareketsiz kalırsa "çürük" sayılır
+
+  pipelineId String
+  pipeline   CrmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  leads Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pipelineId])
+  @@map("crm-stages")
+}
+
+// Müşteri adayı / Fırsat (Deal)
+model Lead {
+  id    String @id @default(cuid()) @map("_id")
+  title String // Fırsat başlığı, örn. "Kadıköy 3+1 arayan - Ahmet Yılmaz"
+
+  // İletişim bilgileri (henüz Client kaydı olmayabilir)
+  contactName  String
+  contactEmail String?
+  contactPhone String?
+  company      String?
+
+  source      LeadSource      @default(OTHER)
+  status      LeadStatus      @default(OPEN)
+  temperature LeadTemperature @default(WARM)
+
+  // Finansal
+  value     Float? // Fırsatın tahmini değeri
+  currency  String @default("TRY")
+  budgetMin Float?
+  budgetMax Float?
+
+  // Talep / eşleştirme kriterleri
+  listingType  ListingType?
+  propertyType PropertyType?
+  city         String?
+  district     String?
+  roomCount    String?
+  requirements String? // Serbest metin talep
+
+  expectedCloseDate DateTime?
+  lostReason        String?
+  wonAt             DateTime?
+  lostAt            DateTime?
+  lastActivityAt    DateTime  @default(now())
+  position          Int       @default(0) // Aşama içi sıralama
+  score             Int       @default(0) // Otomatik lead skoru (0-100)
+
+  tags String[]
+
+  // İlişkiler
+  pipelineId String
+  pipeline   CrmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  stageId String
+  stage   CrmStage @relation(fields: [stageId], references: [id])
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  // Atanan danışman
+  agentId   String?
+  agentName String?
+  agent     Agent?  @relation(fields: [agentId], references: [id])
+
+  // Var olan müşteriye bağlıysa
+  clientId String?
+  client   PropertyClient? @relation(fields: [clientId], references: [id])
+
+  // İlgilenilen ilana bağlıysa
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id])
+
+  // Pazar yeri ziyaretçisi giriş yapmış bir kullanıcıysa onun hesabı.
+  // Müşteriye dönüştürmede e-postaya gerek kalmadan kesin eşleştirme sağlar.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  activities CrmActivity[]
+  tasks      CrmTask[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([pipelineId, stageId])
+  @@index([agentId])
+  @@index([userId])
+  @@map("crm-leads")
+}
+
+// Aktivite / zaman çizelgesi kaydı (not, çağrı, e-posta, aşama değişimi...)
+model CrmActivity {
+  id      String          @id @default(cuid()) @map("_id")
+  type    CrmActivityType
+  title   String
+  content String?
+  meta    Json? // Örn. { fromStage, toStage } veya { duration }
+
+  // Planlı/yapıldı bilgisi (çağrı/toplantı planı için)
+  dueAt       DateTime?
+  completedAt DateTime?
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  // Aktiviteyi yapan danışman
+  agentId   String?
+  agentName String?
+  agent     Agent?  @relation(fields: [agentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([agencyId])
+  @@map("crm-activities")
+}
+
+// Görev (takip et, ara, evrak hazırla...)
+model CrmTask {
+  id          String          @id @default(cuid()) @map("_id")
+  title       String
+  description String?
+  status      CrmTaskStatus   @default(TODO)
+  priority    CrmTaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+  completedAt DateTime?
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  agentId   String?
+  agentName String?
+  agent     Agent?  @relation(fields: [agentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@index([leadId])
+  @@index([agentId])
+  @@map("crm-tasks")
+}
+
+// ============================================================
+// ========  GAYRİMENKUL PROJE YÖNETİMİ (ERP üstü)  ===========
+// ============================================================
+
+enum EstateProjectType {
+  RESIDENTIAL // Konut
+  COMMERCIAL // Ticari
+  MIXED_USE // Karma kullanım
+  INDUSTRIAL // Sanayi
+  LAND // Arsa geliştirme
+}
+
+enum EstateProjectStatus {
+  PLANNING // Planlama
+  PRESALE // Ön satış
+  UNDER_CONSTRUCTION // İnşaat halinde
+  COMPLETED // Tamamlandı
+  DELIVERED // Teslim edildi
+  ON_HOLD // Beklemede
+  CANCELLED // İptal
+}
+
+enum ProjectUnitStatus {
+  AVAILABLE // Müsait
+  RESERVED // Rezerve
+  SOLD // Satıldı
+  BLOCKED // Bloke / satışa kapalı
+  DELIVERED // Teslim edildi
+}
+
+enum ProjectPhaseStatus {
+  NOT_STARTED // Başlamadı
+  IN_PROGRESS // Devam ediyor
+  COMPLETED // Tamamlandı
+  DELAYED // Gecikti
+  ON_HOLD // Durduruldu
+}
+
+enum ProjectTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum ProjectTaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProjectMilestoneStatus {
+  PENDING
+  REACHED
+  MISSED
+}
+
+enum ProjectExpenseCategory {
+  LAND // Arsa
+  CONSTRUCTION // İnşaat
+  LABOR // İşçilik
+  MATERIAL // Malzeme
+  PERMIT // Ruhsat / izin
+  MARKETING // Pazarlama
+  LEGAL // Hukuk
+  FINANCE // Finansman
+  OTHER
+}
+
+enum ProjectExpenseStatus {
+  PLANNED // Planlandı
+  COMMITTED // Taahhüt edildi
+  PAID // Ödendi
+}
+
+enum UnitSaleStatus {
+  RESERVATION // Ön rezervasyon / kapora
+  CONTRACT // Sözleşme imzalandı
+  COMPLETED // Tamamlandı (tapu devri)
+  CANCELLED // İptal
+}
+
+// Geliştirme / inşaat projesi (örn. "Marina Residence")
+model EstateProject {
+  id          String  @id @default(cuid()) @map("_id")
+  name        String
+  slug        String  @unique
+  code        String? // Proje kodu
+  description String?
+
+  type   EstateProjectType
+  status EstateProjectStatus @default(PLANNING)
+
+  // Konum
+  address      String?
+  city         String
+  district     String?
+  neighborhood String?
+  latitude     Float?
+  longitude    Float?
+
+  // Tarihler
+  startDate        DateTime?
+  estimatedEndDate DateTime?
+  actualEndDate    DateTime?
+  deliveryDate     DateTime?
+
+  // Finans
+  budget   Float?
+  currency String @default("TRY")
+
+  // Alanlar
+  totalLandArea         Float? // Arsa alanı (m²)
+  totalConstructionArea Float? // Toplam inşaat alanı (m²)
+  totalBlocks           Int?
+  totalFloors           Int?
+
+  // Medya & ilerleme
+  coverImage String?
+  progress   Int     @default(0) // İnşaat ilerlemesi (%)
+  isFeatured Boolean @default(false)
+
+  // Proje yöneticisi (danışman)
+  managerName String?
+
+  agencyId String
+  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  blocks      ProjectBlock[]
+  units       ProjectUnit[]
+  sales       UnitSale[]
+  phases      ProjectPhase[]
+  milestones  ProjectMilestone[]
+  tasks       ProjectTask[]
+  expenses    ProjectExpense[]
+  contractors ProjectContractor[]
+  documents   ProjectDocument[]
+  images      ProjectImage[]
+  updates     ProjectUpdate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agencyId])
+  @@map("estate-projects")
+}
+
+// Blok / Etap (örn. "A Blok")
+model ProjectBlock {
+  id            String  @id @default(cuid()) @map("_id")
+  name          String
+  code          String?
+  floors        Int?
+  unitsPerFloor Int?
+  description   String?
+  progress      Int     @default(0) // İnşaat ilerlemesi (%)
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  units ProjectUnit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@map("estate-project-blocks")
+}
+
+// Bağımsız bölüm (daire / dükkan / ofis)
+model ProjectUnit {
+  id     String @id @default(cuid()) @map("_id")
+  unitNo String // "A-12", "Daire 5"
+
+  type   PropertyType
+  status ProjectUnitStatus @default(AVAILABLE)
+
+  floor       Int?
+  roomCount   String? // "3+1"
+  grossArea   Float?
+  netArea     Float?
+  balconyArea Float?
+  facing      String? // Cephe (Güney, Deniz vb.)
+  listPrice   Float?
+  currency    String   @default("TRY")
+  description String?
+  features    String[]
+  isFeatured  Boolean  @default(false)
+
+  agencyId String // kapsam kolaylığı için denormalize
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  blockId String?
+  block   ProjectBlock? @relation(fields: [blockId], references: [id], onDelete: SetNull)
+
+  sales UnitSale[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([blockId])
+  @@index([agencyId])
+  @@map("estate-project-units")
+}
+
+// Bağımsız bölüm satışı (ERP müşteri/danışmanına bağlı)
+model UnitSale {
+  id     String         @id @default(cuid()) @map("_id")
+  status UnitSaleStatus @default(RESERVATION)
+
+  salePrice   Float
+  currency    String    @default("TRY")
+  downPayment Float? // Peşinat / kapora
+  commission  Float?
+  saleDate    DateTime?
+  notes       String?
+
+  unitId String
+  unit   ProjectUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  agencyId String
+
+  // ERP bağlantıları (id + denormalize ad)
+  clientId   String?
+  clientName String?
+  agentId    String?
+  agentName  String?
+
+  payments ProjectPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([unitId])
+  @@index([agencyId])
+  @@map("estate-project-unit-sales")
+}
+
+// Satış ödeme planı / taksitler
+model ProjectPayment {
+  id String @id @default(cuid()) @map("_id")
+
+  saleId String
+  sale   UnitSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  title         String
+  amount        Float
+  dueDate       DateTime
+  paidDate      DateTime?
+  status        PaymentStatusGayrimenkul @default(PENDING)
+  paymentMethod String?
+  receiptNo     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([saleId])
+  @@map("estate-project-payments")
+}
+
+// İnşaat fazı
+model ProjectPhase {
+  id            String             @id @default(cuid()) @map("_id")
+  name          String
+  description   String?
+  status        ProjectPhaseStatus @default(NOT_STARTED)
+  order         Int                @default(0)
+  progress      Int                @default(0)
+  startDate     DateTime?
+  endDate       DateTime?
+  plannedBudget Float?
+  actualCost    Float?
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tasks ProjectTask[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@map("estate-project-phases")
+}
+
+// Kilometre taşı
+model ProjectMilestone {
+  id          String                 @id @default(cuid()) @map("_id")
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      ProjectMilestoneStatus @default(PENDING)
+  completedAt DateTime?
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@map("estate-project-milestones")
+}
+
+// Proje görevi
+model ProjectTask {
+  id           String              @id @default(cuid()) @map("_id")
+  title        String
+  description  String?
+  status       ProjectTaskStatus   @default(TODO)
+  priority     ProjectTaskPriority @default(MEDIUM)
+  progress     Int                 @default(0)
+  dueDate      DateTime?
+  completedAt  DateTime?
+  assigneeName String?
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  phaseId String?
+  phase   ProjectPhase? @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+
+  agencyId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@map("estate-project-tasks")
+}
+
+// Müteahhit / taşeron
+model ProjectContractor {
+  id             String  @id @default(cuid()) @map("_id")
+  name           String
+  contactName    String?
+  phone          String?
+  email          String?
+  specialty      String? // "Elektrik", "Kaba inşaat" vb.
+  taxNumber      String?
+  contractAmount Float?
+  notes          String?
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@map("estate-project-contractors")
+}
+
+// Harcama kalemi
+model ProjectExpense {
+  id       String                 @id @default(cuid()) @map("_id")
+  title    String
+  category ProjectExpenseCategory @default(OTHER)
+  status   ProjectExpenseStatus   @default(PLANNED)
+  amount   Float
+  currency String                 @default("TRY")
+  date     DateTime?
+  vendor   String?
+  notes    String?
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  agencyId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@map("estate-project-expenses")
+}
+
+// Proje dökümanı
+model ProjectDocument {
+  id String @id @default(cuid()) @map("_id")
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  type       DocumentTypeGayrimenkul
+  title      String
+  url        String
+  size       Int?
+  uploadedAt DateTime                @default(now())
+
+  @@index([projectId])
+  @@map("estate-project-documents")
+}
+
+// Proje görseli / render
+model ProjectImage {
+  id String @id @default(cuid()) @map("_id")
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  url     String
+  title   String?
+  isCover Boolean @default(false)
+  order   Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@map("estate-project-images")
+}
+
+// Saha / ilerleme güncellemesi
+model ProjectUpdate {
+  id            String  @id @default(cuid()) @map("_id")
+  title         String
+  content       String?
+  progress      Int?
+  imageUrl      String?
+  createdByName String?
+
+  projectId String
+  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+  @@map("estate-project-updates")
+}

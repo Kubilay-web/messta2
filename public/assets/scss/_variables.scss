@@ -1,0 +1,54 @@
+:root {
+	--body-bg : 									248 248 250;
+	--primary: 										84 109 254;
+	--primary-rgb: 									84, 109, 254;
+	--secondary :									215 124 247;
+	--warning :									    244 167 66;
+	--info :										12 163 231;
+	--success :										12 215 177; 
+	--danger :										254 84 84;
+	--light :										245 247 250;
+	--dark :										10 10 10;
+	--orange : 										254 124 88;
+	--pink :                                        254 84 155;
+	--teal : 										0 216 216;
+	--purple : 									    123 118 254;
+	--default-text-color:       					26 38 56;	
+	--default-border:							    239 242 255;
+	--default-background: 						    249 250 251;	
+	--menu-prime-color:								97 116 143;
+	--menu-border-color:							239 242 255;
+	--header-prime-color:							97 116 143;
+	--header-border-color:							239 242 255;
+	--bootstrap-card-border:						239 242 255;
+	--list-hover-focus-bg:							245 246 247;
+	--text-muted: 								    141 158 181;
+	--input-border: 								226 230 241;
+	--red:                                          226 230 241;
+	--blue:											43   62 101;
+	--green:										29  216 113;
+	--cyan:											0   209 209;
+	--indigo:										77   93 219;
+	--gray:											134 153 163;
+	--yellow:										255 193   2;
+	--facebook: 									59   89 152;
+	--twitter: 										0   172 238;
+	--github:										51   51  51;
+	--google: 										207  78  67;
+	--youtube: 										255   0   0;
+	--bs-width:										1px;
+
+}
+
+/* dark mode */
+.dark{
+	--body-bg : 									25 25 28;	
+	--dark-bg : 									 45 45 48;	
+	--default-text-color:       					255 255 255;
+	--default-border:							 	255 255 255;
+	--text-muted: 								    255 255 255;
+	--light:										43 46 49;	
+	--dark :										240 245 248; 	
+	--input-border: 									49 51 53;
+	--form-control-bg: 									35 38 40;
+}

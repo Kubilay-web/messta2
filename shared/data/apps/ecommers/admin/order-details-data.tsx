@@ -1,0 +1,42 @@
+export const OrderDetailsData = [
+    {
+        id:1,
+        name: 'Dapzem & Co (Sweatshirt)',
+        description: 'Branded hoodie ethnic style',
+        quantity: "2",
+        price: "60",
+        total: "120",
+    },
+    {
+        id:2,
+        name: 'Denim Winjo (Jacket)',
+        description: 'Vintage pure leather Jacket',
+        quantity: "1",
+        price: "249",
+        total: "249",
+    },
+    {
+        id:3,
+        name: 'Jimmy Lolfiger (Winter Coat)',
+        description: 'Unisex jacket for men & women',
+        quantity: "1",
+        price: "499",
+        total: "499",
+    },
+    {
+        id:4,
+        name: 'Blueberry & Co',
+        description: 'Light colored sweater form blueberry',
+        quantity: "3",
+        price: "299",
+        total: "897",
+    },
+    {
+        id:5,
+        name: 'Denim Corporation',
+        description: 'Flap pockets denim jackets for men',
+        quantity: "1",
+        price: "599",
+        total: "599",
+    },
+];

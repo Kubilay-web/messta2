@@ -1,0 +1,336 @@
+"use client"
+
+import Pageheader from "@/shared/layouts-components/page-header/pageheader";
+import Seo from "@/shared/layouts-components/seo/seo";
+import Image from "next/image";
+import Link from "next/link";
+import React, { Fragment } from "react";
+
+const OrderTracking = () => {
+    return (
+        <Fragment>
+
+            {/* Start:: Breadcrumb*/}
+            <div className="border-b border-defaultborder dark:border-defaultborder/10 py-4 page-breadcrumb">
+                <div className="container">
+                    {/* Page Header */}
+                    <Seo title={"Order Tracking"} />
+                    <Pageheader Updated={true} breadcrumbs={['Apps', 'Ecommerce', 'Customer']} currentpage="Order Tracking" />
+                    {/* Page Header Close */}
+                </div>
+            </div>
+            {/* End:: Breadcrumb*/}
+
+            {/* <!-- Start:: Section-1 --> */}
+            <section className="section !py-4">
+                <div className="container">
+                    <div className="grid grid-cols-12 gap-x-6">
+                        <div className="xl:col-span-3 col-span-12">
+                            <div className="box">
+                                <div className="sm:flex items-start p-4">
+                                    <div>
+                                        <span className="avatar avatar-lg avatar-rounded online me-3">
+                                            <Image fill src="../../../assets/images/faces/9.jpg" alt="" />
+                                        </span>
+                                    </div>
+                                    <div className="main-profile-info flex-fill">
+                                        <div className="font-semibold mb-1 h6">Jack Miller <div className="hs-tooltip ti-main-tooltip">
+                                            <Link scroll={false} href="#!" className="p-1 hs-tooltip-toggle">
+                                                <i className="bi bi-check-circle-fill text-success text-[0.875rem]"></i>
+                                                <span
+                                                    className="hs-tooltip-content  ti-main-tooltip-content !py-1 !px-2 !bg-black !text-[0.75rem] !font-medium !text-white shadow-sm !rounded-sm"
+                                                    role="tooltip">
+                                                    Verified User
+                                                </span>
+                                            </Link>
+                                        </div></div>
+                                        <p className="mb-0">Member Since 2005</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="box overflow-hidden">
+                                <div className="box-body !p-0">
+                                    <nav className="nav nav-tabs flex !flex-col candidateprofile-nav">
+                                        <Link scroll={false} className="nav-link " href="/ecommerce/customer/customer">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                                                <rect width="256" height="256" fill="none" />
+                                                <rect x="32" y="72" width="192" height="136" rx="8" opacity="0.2" />
+                                                <rect x="32" y="72" width="192" height="136" rx="8" fill="none"
+                                                    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
+                                                    strokeWidth="16" />
+                                                <path d="M88,96V64a40,40,0,0,1,80,0V96" fill="none"
+                                                    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
+                                                    strokeWidth="16" />
+                                            </svg>My Orders</Link>
+                                        <Link scroll={false} className="nav-link" href="/ecommerce/customer/wishlist">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                                                <rect width="256" height="256" fill="none" />
+                                                <path
+                                                    d="M128,224S24,168,24,102A54,54,0,0,1,78,48c22.59,0,41.94,12.31,50,32,8.06-19.69,27.41-32,50-32a54,54,0,0,1,54,54C232,168,128,224,128,224Z"
+                                                    opacity="0.2" />
+                                                <path
+                                                    d="M128,224S24,168,24,102A54,54,0,0,1,78,48c22.59,0,41.94,12.31,50,32,8.06-19.69,27.41-32,50-32a54,54,0,0,1,54,54C232,168,128,224,128,224Z"
+                                                    fill="none" stroke="currentColor" strokeLinecap="round"
+                                                    strokeLinejoin="round" strokeWidth="16" />
+                                            </svg>My Wishlist</Link>
+                                        <Link scroll={false} className="nav-link active" href="/ecommerce/customer/order-tracking">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                                                <rect width="256" height="256" fill="none" />
+                                                <circle cx="200" cy="200" r="24" opacity="0.2" />
+                                                <circle cx="200" cy="200" r="24" fill="none" stroke="currentColor"
+                                                    strokeLinecap="round" strokeLinejoin="round" strokeWidth="16" />
+                                                <path d="M72,56h96a32,32,0,0,1,0,64H72a40,40,0,0,0,0,80H176" fill="none"
+                                                    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
+                                                    strokeWidth="16" />
+                                            </svg>Order Tracking</Link>
+                                        <Link scroll={false} className="nav-link" href="/ecommerce/customer/refunds">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                                                <rect width="256" height="256" fill="none" />
+                                                <path d="M128,128h24a40,40,0,0,1,0,80H128Z" opacity="0.2" />
+                                                <path d="M128,48H112a40,40,0,0,0,0,80h16Z" opacity="0.2" />
+                                                <line x1="128" y1="24" x2="128" y2="48" fill="none"
+                                                    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
+                                                    strokeWidth="16" />
+                                                <line x1="128" y1="208" x2="128" y2="232" fill="none"
+                                                    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
+                                                    strokeWidth="16" />
+                                                <path
+                                                    d="M184,88a40,40,0,0,0-40-40H112a40,40,0,0,0,0,80h40a40,40,0,0,1,0,80H104a40,40,0,0,1-40-40"
+                                                    fill="none" stroke="currentColor" strokeLinecap="round"
+                                                    strokeLinejoin="round" strokeWidth="16" />
+                                            </svg>Refunds</Link>
+                                        <Link scroll={false} className="nav-link" href="/ecommerce/customer/address">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                                                <rect width="256" height="256" fill="none" />
+                                                <path
+                                                    d="M208,32H64a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H208a8,8,0,0,0,8-8V40A8,8,0,0,0,208,32ZM136,144a32,32,0,1,1,32-32A32,32,0,0,1,136,144Z"
+                                                    opacity="0.2" />
+                                                <circle cx="136" cy="112" r="32" fill="none" stroke="currentColor"
+                                                    strokeLinecap="round" strokeLinejoin="round" strokeWidth="16" />
+                                                <line x1="32" y1="72" x2="56" y2="72" fill="none" stroke="currentColor"
+                                                    strokeLinecap="round" strokeLinejoin="round" strokeWidth="16" />
+                                                <line x1="32" y1="128" x2="56" y2="128" fill="none"
+                                                    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
+                                                    strokeWidth="16" />
+                                                <line x1="32" y1="184" x2="56" y2="184" fill="none"
+                                                    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
+                                                    strokeWidth="16" />
+                                                <path d="M88,168a60,60,0,0,1,96,0" fill="none" stroke="currentColor"
+                                                    strokeLinecap="round" strokeLinejoin="round" strokeWidth="16" />
+                                                <rect x="40" y="48" width="192" height="160" rx="8"
+                                                    transform="translate(264 -8) rotate(90)" fill="none"
+                                                    stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
+                                                    strokeWidth="16" />
+                                            </svg>Address Book</Link>
+                                        <Link scroll={false} className="nav-link" href="/ecommerce/customer/settings/">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+                                                <rect width="256" height="256" fill="none" />
+                                                <path
+                                                    d="M230.1,108.76,198.25,90.62c-.64-1.16-1.31-2.29-2-3.41l-.12-36A104.61,104.61,0,0,0,162,32L130,49.89c-1.34,0-2.69,0-4,0L94,32A104.58,104.58,0,0,0,59.89,51.25l-.16,36c-.7,1.12-1.37,2.26-2,3.41l-31.84,18.1a99.15,99.15,0,0,0,0,38.46l31.85,18.14c.64,1.16,1.31,2.29,2,3.41l.12,36A104.61,104.61,0,0,0,94,224l32-17.87c1.34,0,2.69,0,4,0L162,224a104.58,104.58,0,0,0,34.08-19.25l.16-36c.7-1.12,1.37-2.26,2-3.41l31.84-18.1A99.15,99.15,0,0,0,230.1,108.76ZM128,168a40,40,0,1,1,40-40A40,40,0,0,1,128,168Z"
+                                                    opacity="0.2" />
+                                                <circle cx="128" cy="128" r="40" fill="none" stroke="currentColor"
+                                                    strokeLinecap="round" strokeLinejoin="round" strokeWidth="16" />
+                                                <path
+                                                    d="M130.05,206.11c-1.34,0-2.69,0-4,0L94,224a104.61,104.61,0,0,1-34.11-19.2l-.12-36c-.71-1.12-1.38-2.25-2-3.41L25.9,147.24a99.15,99.15,0,0,1,0-38.46l31.84-18.1c.65-1.15,1.32-2.29,2-3.41l.16-36A104.58,104.58,0,0,1,94,32l32,17.89c1.34,0,2.69,0,4,0L162,32a104.61,104.61,0,0,1,34.11,19.2l.12,36c.71,1.12,1.38,2.25,2,3.41l31.85,18.14a99.15,99.15,0,0,1,0,38.46l-31.84,18.1c-.65,1.15-1.32,2.29-2,3.41l-.16,36A104.58,104.58,0,0,1,162,224Z"
+                                                    fill="none" stroke="currentColor" strokeLinecap="round"
+                                                    strokeLinejoin="round" strokeWidth="16" />
+                                            </svg>Settings</Link>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="xl:col-span-9 col-span-12">
+                            <div className="box">
+                                <div className="box-header">
+                                    <div className="box-title">
+                                        Order Tracking
+                                    </div>
+                                </div>
+                                <div className="box-body">
+                                    <div className="grid grid-cols-12 gap-x-6">
+                                        <div className="md:col-span-6 col-span-12">
+                                            <div className="flex items-center mb-2">
+                                                <label className="form-label mb-0">Enter your order ID</label>
+                                                <Link scroll={false} href="#!" data-bs-toggle="tooltip" className="text-primary ms-2" aria-label="Help?"><i className="ti ti-info-circle fs-18"></i></Link>
+                                            </div>
+                                            <div className="custom-form-group mb-3">
+                                                <input type="text" className="form-control form-control-lg" placeholder="Order ID" aria-label="Order ID" />
+                                                <button className="ti-btn ti-btn-primary !bg-primary !border-0 !m-0 !py-1 custom-form-btn" type="button">Track Order</button>
+                                            </div>
+                                        </div>
+                                        <div className="md:col-span-12 col-span-12">
+                                            <div className="flex items-center gap-6">
+                                                <p className="mb-0">
+                                                    <span className="">Order ID : </span>
+                                                    <span className="text-primary ms-1">#115876</span>
+                                                </p>
+                                                <p className="mb-0">
+                                                    <span className="">Product : </span>
+                                                    <span className="text-primary ms-1">Men's Sports Shoes</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="order-track mt-6">
+                                        <div className="hs-accordion-group" data-hs-accordion-always-open>
+                                            <div className="hs-accordion active" id="order-heading-one">
+                                                <Link scroll={false} href="#!" className="hs-accordion-toggle group pb-2 items-center gap-x-3 w-full font-semibold text-start transition"
+                                                    aria-controls="order-collapse-one">
+                                                    <div className="flex mb-0">
+                                                        <div className="me-2">
+                                                            <span className="avatar avatar-md avatar-rounded">
+                                                                <Image fill src="../../../assets/images/ecommerce/png/18.png" alt="" />
+                                                            </span>
+                                                        </div>
+                                                        <div className="">
+                                                            <p className="font-semibold mb-0 text-[0.875rem]">Order Placed</p>
+                                                            <span className="font-medium text-success">Nov 03 , 2024</span>
+                                                        </div>
+                                                    </div>
+                                                </Link>
+                                                <div id="order-collapse-one" className="space-y-3 hs-accordion-content w-full overflow-hidden transition-[height] duration-300" aria-labelledby="order-heading-one">
+                                                    <div className="accordion-body !pt-0 !ps-[3rem]">
+                                                        <div className="">
+                                                            <p className="mb-0">Order placed successfully by <Link scroll={false} href="#!" className="font-semibold text-primary">Sansa Taylor</Link></p>
+                                                            <span className="text-muted fs-12">Nov 03, 2024, 15:36</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="hs-accordion active" id="order-heading-two">
+                                                    <Link scroll={false} href="#!" className="hs-accordion-toggle group pb-2 items-center gap-x-3 w-full font-semibold text-start transition"
+                                                        aria-controls="order-collapse-two">
+                                                        <div className="flex mb-0">
+                                                            <div className="me-2">
+                                                                <span className="avatar avatar-md avatar-rounded">
+                                                                    <Image fill src="../../../assets/images/ecommerce/png/8.png" alt="" />
+                                                                </span>
+                                                            </div>
+                                                            <div className="">
+                                                                <p className="font-semibold mb-0 text-[0.875rem]">Picked</p>
+                                                                <span className="text-[0.75rem] font-medium">Nov 03, 15:10</span>
+                                                            </div>
+                                                        </div>
+                                                    </Link>
+                                                    <div id="order-collapse-two"
+                                                        className="space-y-3 hs-accordion-content w-full overflow-hidden transition-[height] duration-300"
+                                                        aria-labelledby="order-heading-two">
+                                                        <div className="accordion-body !pt-0 !ps-[3rem]">
+                                                            <div className="">
+                                                                <p className="mb-0">Your order has been picked up by <span className="font-semibold">Smart Good Services</span></p>
+                                                                <span className="text-muted fs-12">Nov 03, 2024, 15:36</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="hs-accordion active" id="order-heading-three">
+                                                    <Link scroll={false} href="#!" className="hs-accordion-toggle group pb-2 items-center gap-x-3 w-full font-semibold text-start transition" aria-controls="order-collapse-three">
+                                                        <div className="flex mb-0">
+                                                            <div className="me-2">
+                                                                <span className="avatar avatar-md avatar-rounded">
+                                                                    <Image fill src="../../../assets/images/ecommerce/png/19.png" alt="" />
+                                                                </span>
+                                                            </div>
+                                                            <div className="">
+                                                                <p className="font-semibold mb-0 text-[0.875rem]">Shipping</p>
+                                                                <span className="text-[0.75rem] font-medium">Nov 03, 15:10</span>
+                                                            </div>
+                                                        </div>
+                                                    </Link>
+                                                    <div id="order-collapse-three"
+                                                        className="space-y-3 hs-accordion-content w-full overflow-hidden transition-[height] duration-300"
+                                                        aria-labelledby="order-heading-three">
+                                                        <div className="accordion-body !pt-0 !ps-[3rem]">
+                                                            <div className=" mb-4">
+                                                                <p className="mb-0">Arrived USA <span className="font-semibold">SGS Warehouse</span></p>
+                                                                <span className="text-muted text-[0.75rem]">Nov 03, 2024, 15:36</span>
+                                                            </div>
+                                                            <div className=" mb-4">
+                                                                <p className="mb-0">picked up by <span className="font-semibold">SGS Agent</span> and on the way to Hyderabad</p>
+                                                                <span className="text-muted text-[0.75rem]">Nov 03, 2024, 15:36</span>
+                                                            </div>
+                                                            <div className="">
+                                                                <p className="mb-0">Arrived in Hyderabad and expected Delivery is <span className="font-semibold">Apr 16, 2024</span> </p>
+                                                                <span className="text-muted text-[0.75rem]">Nov 03, 2024, 15:36</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="hs-accordion" id="order-heading-four">
+                                                    <Link scroll={false} href="#!" className="hs-accordion-toggle group pb-3 inline-flex items-center gap-x-3 w-full font-semibold text-start transition">
+                                                        <div className="flex mb-0">
+                                                            <div className="me-2">
+                                                                <span className="avatar avatar-md avatar-rounded bg-light !text-dark border !border-light"><i className="fe fe-package text-[0.75rem]"></i></span>
+                                                            </div>
+                                                            <div className="">
+                                                                <p className="font-semibold mb-0 text-[0.875rem]">Out For Delivery</p>
+                                                                <span className="text-[#8c9097] dark:text-white/50 text-[0.75rem] font-normal">Nov 03, 15:10 (expected)</span>
+                                                            </div>
+                                                        </div>
+                                                    </Link>
+                                                    <div id="order-collapse-four"
+                                                        className="space-y-3 hs-accordion-content hidden  w-full overflow-hidden transition-[height] duration-300"
+                                                        aria-labelledby="order-heading-four">
+                                                        <div className="accordion-body !pt-0 !ps-[3rem]">
+                                                            <div className="mb-1">
+                                                                <p className="mb-0">Your order is out for delivery</p>
+                                                                <span className="text-textmuted dark:text-textmuted/50 text-[0.75rem]">Nov 03, 2022, 15:36</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="hs-accordion" id="order-heading-five">
+                                                    <Link scroll={false} href="#!" className="hs-accordion-toggle group inline-flex items-center gap-x-3 w-full font-semibold text-start transition">
+                                                        <div className="flex mb-0">
+                                                            <div className="me-2">
+                                                                <span className="avatar avatar-md avatar-rounded bg-light !text-dark border !border-light"><i className="fe fe-package text-[0.75rem]"></i></span>
+                                                            </div>
+                                                            <div className="">
+                                                                <p className="font-semibold mb-0 text-[0.875rem]">Delivered</p>
+                                                                <span className="text-[0.75rem] text-[#8c9097] dark:text-white/50">Nov 03, 18:42</span>
+                                                            </div>
+                                                        </div>
+                                                    </Link>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {/* <!-- End:: Section-1 --> */}
+
+            {/* <!-- Start:: Section-2 --> */}
+            <section className="section bg-banner lg:px-0 px-4 !py-[4.375rem]">
+                <div className="grid grid-cols-12 gap-x-6 justify-center">
+                    <div className="lg:col-span-3 col-span-1 text-center"></div>
+                    <div className="lg:col-span-6 col-span-10 text-center">
+                        <div className="mb-4">
+                            <h3 className="font-semibold mb-2 text-white">&#128073; Download our free mobile apps today
+                            </h3>
+                        </div>
+                        <h6 className="mb-4 opacity-90 text-white">Labore no sed ipsum ipsum nonumy. Sit ipsum sanctus ea
+                            magna est. Kasd diam rebum sit ipsum ipsum erat et kasd.Est amet sit vero sanctus labore no
+                            sed ipsum ipsum nonumy vero sanctus labore..</h6>
+                        <div className="btn-list">
+                            <Link scroll={false} href="#!" className="ti-btn  bg-black app-store relative">
+                                <Image fill src="../../../assets/images/media/apps/play-store.png" alt="" />
+                                Google Play
+                            </Link>
+                            <Link scroll={false} href="#!" className="ti-btn  bg-black app-store relative">
+                                <Image fill src="../../../assets/images/media/apps/apple-store.png" alt="" className="invert-1" />
+                                App Store
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="lg:col-span-3 col-span-1 text-center"></div>
+                </div>
+            </section>
+            {/* <!-- End:: Section-2 --> */}
+        </Fragment>
+    );
+};
+
+export default OrderTracking;

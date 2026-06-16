@@ -1,0 +1,10 @@
+.box.box-bg-primary {
+    @apply bg-primary text-white #{!important};
+}
+.box.box-bg-success {
+    @apply bg-secondary text-white #{!important};
+}   
+
+.card-img-overlay {
+    @apply absolute top-0 right-0 bottom-0 left-0 p-4 rounded-[0.375rem];
+}

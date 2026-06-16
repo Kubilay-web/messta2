@@ -1,0 +1,74 @@
+/* Start:: React-select */
+
+// .Select2__control{
+//   @apply bg-white dark:bg-bodybg border-defaultborder dark:border-defaultborder/10 text-defaulttextcolor dark:text-defaulttextcolor/80 #{!important};
+// }
+
+// .Select2__menu {
+//   @apply bg-white dark:bg-bodybg border-defaultborder dark:border-defaultborder/10 text-defaulttextcolor dark:text-defaulttextcolor/80 #{!important};
+// }
+// .Select2__option {
+//   @apply bg-white dark:bg-bodybg border-defaultborder dark:border-defaultborder/10 text-defaulttextcolor dark:text-defaulttextcolor/80 #{!important};
+//   @apply hover:bg-primary hover:text-white #{!important};
+//  }
+
+
+.Select2__option--is-focused {
+    @apply dark:bg-bodybg #{!important};
+  }
+  .Select2__control {
+    @apply rounded-sm #{!important};
+  }
+  .Select2__menu{
+    @apply bg-white dark:bg-bodybg border-defaultborder dark:border-defaultborder/10 #{!important};
+  }
+  .Select2__option:hover {
+    @apply text-[#fff] bg-primary #{!important};
+  }
+  .Select2__menu {
+    div,
+    li,
+    .Select2__single-value {
+      &.active,
+      .Select2__option--is-selected {
+        @apply bg-primary text-white #{!important};
+
+      }
+    }
+  }
+  
+  .Select2__option--is-selected,
+  .Select2__option--is-focused {
+    @apply bg-white text-defaulttextcolor #{!important};
+  }
+  .Select2__option:hover {  
+    @apply bg-primary #{!important};
+  }
+  .Select2__control {
+    @apply bg-white border-inputborder dark:bg-bodybg dark:border-defaultborder/10 #{!important}; 
+  }
+  .Select2__option, .Select2__single-value {
+    img {
+        @apply w-[30px] h-[30px]  rounded-full  #{!important};
+    }
+  }
+  
+  .Select2__input-container, .Select2__single-value {
+    @apply text-defaulttextcolor dark:text-defaulttextcolor/70 #{!important};
+  }
+
+  .default{
+    .Select2__multi-value__label {
+        @apply py-[0.15rem] px-[0.625rem] bg-primary text-white #{!important};
+    }
+    .Select2__multi-value__remove{
+     @apply hidden;
+    }
+  }
+  .Select2__multi-value {
+    @apply bg-primary text-[#fff] rounded-[4px] #{!important};
+  }
+  .Select2__multi-value__label {
+    @apply text-[#fff] #{!important};
+  }
+  /* End:: React-select */
