@@ -5,22 +5,11 @@
 import db from "@/app/lib/db";
 import { validateRequest } from "@/app/auth";
 import { revalidatePath } from "next/cache";
-
-export const REPORT_REASONS: { value: string; label: string }[] = [
-  { value: "FRAUD", label: "Dolandırıcılık / şüpheli ilan" },
-  { value: "WRONG_INFO", label: "Yanlış / yanıltıcı bilgi" },
-  { value: "SOLD", label: "Satılmış / kiralanmış (hâlâ yayında)" },
-  { value: "DUPLICATE", label: "Mükerrer ilan" },
-  { value: "SPAM", label: "Spam / alakasız" },
-  { value: "OFFENSIVE", label: "Uygunsuz içerik" },
-  { value: "OTHER", label: "Diğer" },
-];
-
-const VALID = new Set(REPORT_REASONS.map((r) => r.value));
+import { REPORT_REASON_VALUES } from "../lib/report-reasons";
 
 export async function reportListing(listingId: string, reason: string, details?: string) {
   try {
-    if (!VALID.has(reason)) return { error: "Lütfen bir şikayet nedeni seçin." };
+    if (!REPORT_REASON_VALUES.has(reason)) return { error: "Lütfen bir şikayet nedeni seçin." };
 
     const listing = await db.listing.findUnique({ where: { id: listingId }, select: { id: true } });
     if (!listing) return { error: "İlan bulunamadı." };

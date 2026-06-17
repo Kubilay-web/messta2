@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Flag, X, Loader2, CheckCircle2 } from "lucide-react";
-import { reportListing, REPORT_REASONS } from "../actions/reports";
+import { reportListing } from "../actions/reports";
+import { REPORT_REASONS } from "../lib/report-reasons";
 
 export default function ReportButton({ listingId, loggedIn }: { listingId: string; loggedIn: boolean }) {
   const router = useRouter();

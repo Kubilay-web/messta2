@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ExternalLink, Check, X, Eye, Loader2 } from "lucide-react";
 import { updateReportStatus } from "../actions/reports";
-import { REPORT_REASONS } from "../actions/reports";
+import { REPORT_REASONS } from "../lib/report-reasons";
 import { timeAgo } from "../lib/format";
 
 const reasonLabel = (v: string) => REPORT_REASONS.find((r) => r.value === v)?.label ?? v;
