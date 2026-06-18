@@ -1,435 +1,395 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { Metadata } from "next";
+import { validateRequest } from "@/app/auth";
 import {
-  MapPin, BedDouble, Maximize, Bath, Building2, Calendar, ArrowUpDown, Flame, Eye, ChevronRight,
-  Layers, BadgeCheck, Video, Compass, TrendingDown, LineChart, ShieldCheck,
-} from "lucide-react";
-import Gallery from "../../components/Gallery";
-import MapEmbed from "../../components/MapEmbed";
-import InquiryForm from "../../components/InquiryForm";
-import MortgageCalculator from "../../components/MortgageCalculator";
-import ShareButton from "../../components/ShareButton";
-import ContactReveal from "../../components/ContactReveal";
-import FavoriteButton from "../../components/FavoriteButton";
-import CompareButton from "../../components/CompareButton";
-import RecentTracker from "../../components/RecentTracker";
-import RecentlyViewed from "../../components/RecentlyViewed";
-import ListingCard from "../../components/ListingCard";
-import MessageButton from "../../components/MessageButton";
-import ReportButton from "../../components/ReportButton";
-import { getMarketUser } from "../../lib/auth";
-import {
-  getMarketplaceListingDetail, getListingMeta, getSimilarListings, getPriceHistory,
-} from "../../actions/listings";
-import { getMyFavoriteIds } from "../../actions/favorites";
-import { getSellerRating } from "../../actions/reviews";
-import StarRating from "../../components/StarRating";
-import {
-  PROPERTY_TYPE_LABEL, LISTING_TYPE_LABEL, LISTING_TYPE_BADGE, HEATING_LABEL,
-  AMENITY_DEFS, formatPrice, listingPrice, locationText, formatDate, timeAgo,
-  deedStatusLabel, buildStatusLabel, structureTypeLabel, usageStatusLabel,
-  zoningStatusLabel, subTypeLabel, FACING_LABEL,
-} from "../../lib/format";
-import { groupFeatures } from "../../lib/features";
+  getListingById,
+  getSimilarListings,
+  getUserFavoriteIds,
+  getPriceHistory,
+  getUserReviews,
+  getUserRating,
+  getTopCategorySlug,
+  getRegionPriceStats,
+} from "../../data";
+import { incrementView, recordRecentView } from "../../actions";
+import { formatPrice, formatDate, timeAgo } from "../../lib/format";
+import { CATEGORY_ATTRIBUTES, LISTING_TYPE_LABELS } from "../../lib/categories";
+import ImageGallery from "../../components/image-gallery";
+import ContactSeller from "../../components/contact-seller";
+import FavoriteButton from "../../components/favorite-button";
+import ListingCard from "../../components/listing-card";
+import ReviewSection, { Stars } from "../../components/review-section";
+import MapView from "../../components/map-view";
+import MortgageCalculator from "../../components/mortgage-calculator";
+import VideoEmbed from "../../components/video-embed";
+import Tour360 from "../../components/tour-360";
+import AppointmentForm from "../../components/appointment-form";
+import DepositButton from "../../components/deposit-button";
+import CompareButton from "../../components/compare-button";
+import EmlakFeaturesView from "../../components/emlak-features-view";
+import type { EmlakFeatures } from "../../lib/emlak-features";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params;
-  const l = await getListingMeta(id);
-  if (!l) return { title: "İlan bulunamadı — sahibinden" };
-  const loc = locationText(l.property);
-  return {
-    title: `${l.title} — sahibinden`,
-    description: `${LISTING_TYPE_LABEL[l.listingType] ?? ""} ${PROPERTY_TYPE_LABEL[l.property?.propertyType ?? ""] ?? ""} ${loc} • ${formatPrice(l.askingPrice, l.currency)}`,
-    openGraph: { images: l.property?.images?.[0]?.url ? [l.property.images[0].url] : [] },
-  };
-}
+// Tüm kategori attribute'larından tek bir etiket sözlüğü
+const ATTR_LABELS: Record<string, string> = Object.values(CATEGORY_ATTRIBUTES)
+  .flat()
+  .reduce((acc, f) => {
+    acc[f.key] = f.label;
+    return acc;
+  }, {} as Record<string, string>);
 
-export default async function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ListingDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const data = await getMarketplaceListingDetail(id);
-  if (!data?.listing) notFound();
+  const listing = await getListingById(id);
+  if (!listing) notFound();
 
-  const { listing, property, agent } = data;
-  const [favIds, similar, priceHistory, marketUser] = await Promise.all([
-    getMyFavoriteIds(),
-    getSimilarListings(id, property?.city, listing.listingType),
-    getPriceHistory(id),
-    getMarketUser(),
+  await incrementView(id);
+
+  const { user } = await validateRequest();
+  if (user) await recordRecentView(id);
+  const [similar, favIds, priceHistory, sellerReviews, sellerRating, topSlug, regionStats] = await Promise.all([
+    getSimilarListings(listing.categoryId, listing.id, 5),
+    user ? getUserFavoriteIds(user.id) : Promise.resolve(new Set<string>()),
+    getPriceHistory(listing.id),
+    getUserReviews(listing.userId),
+    getUserRating(listing.userId),
+    getTopCategorySlug(listing.categoryId),
+    getRegionPriceStats(listing.categoryId, listing.city),
   ]);
-  const isOwnListing = !!marketUser && listing.ownerUserId === marketUser.id;
-  const sellerRating = listing.ownerUserId ? await getSellerRating(listing.ownerUserId) : { avg: 0, count: 0 };
-  const isFav = favIds.includes(id);
-  const priceDropped =
-    listing.previousPrice != null && listing.askingPrice != null && listing.askingPrice < listing.previousPrice;
 
-  const specs: { Icon: any; label: string; value: string }[] = [
-    property?.roomCount ? { Icon: BedDouble, label: "Oda", value: property.roomCount } : null,
-    property?.grossArea != null ? { Icon: Maximize, label: "Brüt m²", value: `${property.grossArea} m²` } : null,
-    property?.netArea != null ? { Icon: Maximize, label: "Net m²", value: `${property.netArea} m²` } : null,
-    property?.bathroomCount != null ? { Icon: Bath, label: "Banyo", value: String(property.bathroomCount) } : null,
-    property?.floorNo != null ? { Icon: ArrowUpDown, label: "Kat", value: String(property.floorNo) } : null,
-    property?.totalFloors != null ? { Icon: Layers, label: "Toplam Kat", value: String(property.totalFloors) } : null,
-    property?.buildingAge != null ? { Icon: Calendar, label: "Bina Yaşı", value: `${property.buildingAge}` } : null,
-    property?.heatingType ? { Icon: Flame, label: "Isıtma", value: HEATING_LABEL[property.heatingType] ?? property.heatingType } : null,
-  ].filter(Boolean) as any[];
+  const isEmlak = topSlug === "emlak";
+  const grossArea = Number((listing.attributes as Record<string, unknown> | null)?.grossArea) || 0;
 
-  const activeAmenities = AMENITY_DEFS.filter((a) => (property as any)?.[a.key]);
-  const isRent = listing.listingType === "RENT" || listing.listingType === "SHORT_RENT";
+  const sellerReviewDto = sellerReviews.map((r) => ({
+    id: r.id,
+    rating: r.rating,
+    comment: r.comment,
+    createdAt: new Date(r.createdAt).toISOString(),
+    authorName: r.author.displayName || r.author.username || "Üye",
+    authorAvatar: r.author.avatarUrl ?? null,
+  }));
 
-  // Gruplu özellikler (iç/dış/muhit/ulaşım/manzara)
-  const featureGroups = groupFeatures((property as any)?.features ?? []);
+  const attrs = (listing.attributes as Record<string, unknown> | null) ?? {};
+  const emlakFeatures = (attrs.features as EmlakFeatures | undefined) ?? null;
+  const attrEntries = Object.entries(attrs).filter(
+    ([k, v]) => k !== "features" && v !== "" && v !== null && v !== undefined,
+  );
+  const place = [listing.city, listing.district, listing.neighborhood].filter(Boolean).join(" / ");
+  const isOwner = user?.id === listing.userId;
 
-  // Detaylı bilgi tablosu (sahibinden tarzı)
-  const facingText = ((property as any)?.facing ?? []).map((f: string) => FACING_LABEL[f] ?? f).join(", ");
-  const detailRows: { label: string; value: string }[] = [
-    property?.subType ? { label: "Kategori", value: subTypeLabel(property.subType)! } : null,
-    (property as any)?.dues != null ? { label: "Aidat", value: formatPrice((property as any).dues, listing.currency) + " / ay" } : null,
-    property?.deedStatus ? { label: "Tapu Durumu", value: deedStatusLabel(property.deedStatus)! } : null,
-    property?.buildStatus ? { label: "Yapının Durumu", value: buildStatusLabel(property.buildStatus)! } : null,
-    property?.structureType ? { label: "Yapı Tipi", value: structureTypeLabel(property.structureType)! } : null,
-    property?.usageStatus ? { label: "Kullanım Durumu", value: usageStatusLabel(property.usageStatus)! } : null,
-    facingText ? { label: "Cephe", value: facingText } : null,
-    (property as any)?.inSite ? { label: "Site İçerisinde", value: property?.siteName ? `Evet (${property.siteName})` : "Evet" } : null,
-    // Arsa
-    property?.zoningStatus ? { label: "İmar Durumu", value: zoningStatusLabel(property.zoningStatus)! } : null,
-    property?.blockNo ? { label: "Ada No", value: property.blockNo } : null,
-    property?.parcelNo ? { label: "Parsel No", value: property.parcelNo } : null,
-    property?.kaks ? { label: "KAKS / Emsal", value: property.kaks } : null,
-    property?.gabari ? { label: "Gabari", value: property.gabari } : null,
-    property?.facadeCount != null ? { label: "Cephe Sayısı", value: String(property.facadeCount) } : null,
-  ].filter(Boolean) as { label: string; value: string }[];
-
-  const extraBadges: string[] = [
-    (property as any)?.creditEligible ? "Krediye Uygun" : null,
-    (property as any)?.swappable ? "Takaslı" : null,
-    (property as any)?.accessible ? "Engelliye Uygun" : null,
-  ].filter(Boolean) as string[];
-
-  // JSON-LD (schema.org) — Google emlak zenginleştirmesi
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": isRent ? "RentAction" : "Residence",
-    name: listing.title,
-    description: (listing.description || property?.description || "").slice(0, 300),
-    url: `/sahibinden/ilan/${id}`,
-    image: property?.images?.map((im: any) => im.url).slice(0, 6) ?? [],
-    ...(property?.grossArea
-      ? { floorSize: { "@type": "QuantitativeValue", value: property.grossArea, unitCode: "MTK" } }
-      : {}),
-    ...(property?.roomCount ? { numberOfRooms: property.roomCount } : {}),
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: property?.district ?? undefined,
-      addressRegion: property?.city ?? undefined,
-      addressCountry: "TR",
-      streetAddress: property?.neighborhood ?? undefined,
-    },
-    ...(property?.latitude && property?.longitude
-      ? { geo: { "@type": "GeoCoordinates", latitude: property.latitude, longitude: property.longitude } }
-      : {}),
-    offers: {
-      "@type": "Offer",
-      price: isRent && listing.monthlyRent ? listing.monthlyRent : listing.askingPrice,
-      priceCurrency: listing.currency ?? "TRY",
-      availability: "https://schema.org/InStock",
-    },
-  };
+  function attrValue(v: unknown) {
+    if (v === true) return "Evet";
+    if (v === false) return "Hayır";
+    return String(v);
+  }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-5 sm:py-7">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <RecentTracker id={id} />
-
-      {/* Breadcrumb */}
-      <nav className="mb-3 flex flex-wrap items-center gap-1 text-xs text-slate-500">
-        <Link href="/sahibinden" className="hover:text-amber-600">Anasayfa</Link>
-        <ChevronRight className="h-3 w-3" />
-        <Link href={`/sahibinden/ilanlar?type=${listing.listingType}`} className="hover:text-amber-600">{LISTING_TYPE_LABEL[listing.listingType]}</Link>
-        {property?.city && (
-          <>
-            <ChevronRight className="h-3 w-3" />
-            <Link href={`/sahibinden/ilanlar?city=${encodeURIComponent(property.city)}`} className="hover:text-amber-600">{property.city}</Link>
-          </>
-        )}
+    <div>
+      <nav className="mb-3 flex flex-wrap items-center gap-1 text-xs text-gray-500">
+        <Link href="/sahibinden" className="hover:text-yellow-600">Anasayfa</Link>
+        <span>/</span>
+        <Link href={`/sahibinden/kategori/${listing.category.slug}`} className="hover:text-yellow-600">
+          {listing.category.name}
+        </Link>
       </nav>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Sol: galeri + detaylar */}
-        <div className="space-y-6 lg:col-span-2">
-          <Gallery images={property?.images ?? []} title={listing.title} />
-
-          {/* Başlık + fiyat */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold text-white ${LISTING_TYPE_BADGE[listing.listingType] ?? "bg-slate-700"}`}>
-                    {LISTING_TYPE_LABEL[listing.listingType]}
-                  </span>
-                  {listing.channel === "INDIVIDUAL" && (
-                    <span className="flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-600">
-                      <BadgeCheck className="h-3 w-3" /> Sahibinden
-                    </span>
-                  )}
-                  {(listing as any).verified && (
-                    <span className="flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-bold text-sky-600">
-                      <ShieldCheck className="h-3 w-3" /> Onaylı İlan
-                    </span>
-                  )}
-                  {listing.urgentUntil && new Date(listing.urgentUntil) > new Date() && (
-                    <span className="flex items-center gap-1 rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white">
-                      <Flame className="h-3 w-3" /> Acil
-                    </span>
-                  )}
-                  <span className="text-xs text-slate-400">İlan No: {listing.listingNo}</span>
-                </div>
-                <h1 className="mt-2 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">{listing.title}</h1>
-                <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
-                  <MapPin className="h-4 w-4 text-amber-500" /> {locationText(property) || "—"}
-                </p>
-              </div>
-              <div className="text-right">
-                {priceDropped && (
-                  <p className="flex items-center justify-end gap-1.5 text-sm">
-                    <span className="text-slate-400 line-through">{formatPrice(listing.previousPrice, listing.currency)}</span>
-                    <span className="flex items-center gap-0.5 rounded-md bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white">
-                      <TrendingDown className="h-3 w-3" /> Düştü
-                    </span>
-                  </p>
-                )}
-                <p className="text-2xl font-black text-amber-600 sm:text-3xl">{listingPrice(listing)}</p>
-                {listing.isNegotiable && <p className="text-xs text-slate-400">Pazarlık payı var</p>}
-                {isRent && listing.deposit != null && (
-                  <p className="mt-0.5 text-xs text-slate-500">Depozito: {formatPrice(listing.deposit, listing.currency)}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
-              <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> {listing.views} görüntülenme</span>
-              <span className="opacity-40">•</span>
-              <span>{timeAgo(listing.publishedAt ?? listing.createdAt)} yayınlandı</span>
-              <span className="ml-auto flex items-center gap-2">
-                <ShareButton title={listing.title} />
-              </span>
-            </div>
-          </div>
-
-          {/* Özellikler tablosu */}
-          {specs.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-              <h2 className="mb-3 text-sm font-bold text-slate-800">Temel Özellikler</h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {specs.map((s, i) => (
-                  <div key={i} className="rounded-xl bg-slate-50 p-3">
-                    <s.Icon className="h-4 w-4 text-amber-500" />
-                    <p className="mt-1.5 text-[11px] font-medium text-slate-400">{s.label}</p>
-                    <p className="text-sm font-bold text-slate-800">{s.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Detaylı bilgiler */}
-          {(detailRows.length > 0 || extraBadges.length > 0) && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-              <h2 className="mb-3 text-sm font-bold text-slate-800">Detaylı Bilgiler</h2>
-              {detailRows.length > 0 && (
-                <dl className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-                  {detailRows.map((r) => (
-                    <div key={r.label} className="flex items-center justify-between border-b border-slate-50 py-2 text-sm">
-                      <dt className="text-slate-500">{r.label}</dt>
-                      <dd className="font-semibold text-slate-800">{r.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-              {extraBadges.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {extraBadges.map((b) => (
-                    <span key={b} className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700">
-                      <BadgeCheck className="h-4 w-4" /> {b}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Donanım (temel) */}
-          {activeAmenities.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-              <h2 className="mb-3 text-sm font-bold text-slate-800">Öne Çıkan Özellikler</h2>
-              <div className="flex flex-wrap gap-2">
-                {activeAmenities.map((a) => (
-                  <span key={a.key} className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700">
-                    <BadgeCheck className="h-4 w-4" /> {a.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Gruplu özellikler (iç/dış/muhit/ulaşım/manzara) */}
-          {featureGroups.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-              <h2 className="mb-4 text-sm font-bold text-slate-800">Özellikler & İmkanlar</h2>
-              <div className="space-y-4">
-                {featureGroups.map(({ group, items }) => (
-                  <div key={group.key}>
-                    <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{group.label}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {items.map((it) => (
-                        <span key={it.key} className="flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-[13px] text-slate-600 ring-1 ring-slate-100">
-                          <BadgeCheck className="h-3.5 w-3.5 text-emerald-500" /> {it.label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+      <div className="grid gap-5 lg:grid-cols-3">
+        {/* Sol: görsel + açıklama */}
+        <div className="space-y-5 lg:col-span-2">
+          <ImageGallery images={listing.images} title={listing.title} />
 
           {/* Açıklama */}
-          {(listing.description || property?.description) && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-              <h2 className="mb-3 text-sm font-bold text-slate-800">Açıklama</h2>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-slate-600">
-                {listing.description || property?.description}
-              </p>
+          <section className="rounded-xl border border-gray-200 bg-white p-4">
+            <h2 className="mb-3 text-lg font-bold text-gray-800">Açıklama</h2>
+            <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+              {listing.description || "Açıklama girilmemiş."}
             </div>
-          )}
+          </section>
 
-          {/* Fiyat geçmişi */}
-          {priceHistory.length > 1 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
-                <LineChart className="h-4 w-4 text-amber-500" /> Fiyat Geçmişi
-              </h2>
-              <div className="space-y-1.5">
-                {priceHistory.map((h, i) => {
-                  const prev = i > 0 ? priceHistory[i - 1].price : null;
-                  const diff = prev != null ? h.price - prev : 0;
-                  return (
-                    <div key={i} className="flex items-center justify-between border-b border-slate-50 py-1.5 text-sm last:border-0">
-                      <span className="text-slate-500">{formatDate(h.createdAt)}</span>
-                      <span className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-800">{formatPrice(h.price, h.currency)}</span>
-                        {diff !== 0 && (
-                          <span className={`text-xs font-bold ${diff < 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                            {diff < 0 ? "↓" : "↑"} {formatPrice(Math.abs(diff), h.currency)}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  );
-                })}
+          {/* Emlak medya: kat planı + video + 360° */}
+          {listing.tourImageUrl && (
+            <section className="rounded-xl border border-gray-200 bg-white p-4">
+              <h2 className="mb-3 text-lg font-bold text-gray-800">🌐 360° Sanal Tur</h2>
+              <Tour360 image={listing.tourImageUrl} />
+            </section>
+          )}
+          {listing.videoUrl && (
+            <section className="rounded-xl border border-gray-200 bg-white p-4">
+              <h2 className="mb-3 text-lg font-bold text-gray-800">🎥 Video Tur</h2>
+              <VideoEmbed url={listing.videoUrl} />
+            </section>
+          )}
+          {listing.floorPlans && listing.floorPlans.length > 0 && (
+            <section className="rounded-xl border border-gray-200 bg-white p-4">
+              <h2 className="mb-3 text-lg font-bold text-gray-800">📐 Kat Planı</h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {listing.floorPlans.map((img, i) => (
+                  <a key={i} href={img} target="_blank" rel="noreferrer" className="overflow-hidden rounded-lg border border-gray-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={img} alt={`Kat planı ${i + 1}`} className="h-40 w-full object-contain bg-gray-50" />
+                  </a>
+                ))}
               </div>
-            </div>
+            </section>
           )}
 
-          {/* Video / Sanal tur */}
-          {(listing.videoUrl || listing.virtualTourUrl) && (
-            <div className="flex flex-wrap gap-2">
-              {listing.videoUrl && (
-                <a href={listing.videoUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-                  <Video className="h-4 w-4 text-rose-500" /> Tanıtım Videosu
+          {/* Konum */}
+          {place && (
+            <section className="rounded-xl border border-gray-200 bg-white p-4">
+              <h2 className="mb-2 text-lg font-bold text-gray-800">Konum</h2>
+              <p className="text-sm text-gray-600">{place}</p>
+              {typeof listing.latitude === "number" && typeof listing.longitude === "number" ? (
+                <div className="mt-3">
+                  <MapView lat={listing.latitude} lng={listing.longitude} height={300} />
+                </div>
+              ) : (
+                <a
+                  href={`https://www.google.com/maps/search/${encodeURIComponent(place)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-block text-sm font-semibold text-yellow-600 hover:underline"
+                >
+                  Haritada göster →
                 </a>
               )}
-              {listing.virtualTourUrl && (
-                <a href={listing.virtualTourUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-                  <Compass className="h-4 w-4 text-sky-500" /> 360° Sanal Tur
-                </a>
-              )}
-            </div>
+            </section>
           )}
-
-          {/* Harita */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
-              <MapPin className="h-4 w-4 text-amber-500" /> Konum
-            </h2>
-            <MapEmbed lat={property?.latitude} lng={property?.longitude} query={locationText(property)} height={340} />
-          </div>
         </div>
 
-        {/* Sağ: iletişim + kredi + benzer */}
-        <aside className="space-y-4">
-          <div className="space-y-3 lg:sticky lg:top-20">
-            {/* İletişim kartı */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                {agent?.imageUrl || listing.agency?.logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={agent?.imageUrl || listing.agency?.logo || ""} alt="" className="h-12 w-12 rounded-full object-cover" />
-                ) : (
-                  <span className="grid h-12 w-12 place-items-center rounded-full bg-amber-100 text-amber-600">
-                    <Building2 className="h-6 w-6" />
+        {/* Sağ: özet + iletişim */}
+        <div className="space-y-4">
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-2">
+              <h1 className="text-lg font-bold text-gray-800">{listing.title}</h1>
+              <FavoriteButton listingId={listing.id} initial={favIds.has(listing.id)} />
+            </div>
+            <p className="mt-2 text-2xl font-extrabold text-yellow-600">
+              {formatPrice(listing.price, listing.currency)}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded bg-blue-50 px-2 py-1 font-semibold text-blue-600">
+                {LISTING_TYPE_LABELS[listing.type] ?? listing.type}
+              </span>
+              {listing.isUrgent && (
+                <span className="rounded bg-red-50 px-2 py-1 font-semibold text-red-600">Acil</span>
+              )}
+              <span className="text-gray-600">İlan No: {listing.listingNo}</span>
+            </div>
+            <div className="mt-2 flex items-center gap-3 text-xs text-gray-600">
+              <span>{timeAgo(listing.createdAt)}</span>
+              <span>•</span>
+              <span>{listing.viewCount} görüntülenme</span>
+            </div>
+
+            {(listing.isNegotiable || listing.acceptsSwap || listing.securePayment) && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {listing.isNegotiable && (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                    💬 Pazarlık payı var
                   </span>
                 )}
-                <div className="min-w-0">
-                  <p className="truncate font-bold text-slate-900">
-                    {agent ? `${agent.firstName} ${agent.lastName}` : listing.agentName || listing.agency?.name || "İlan Sahibi"}
-                  </p>
-                  <p className="truncate text-xs text-slate-500">
-                    {listing.channel === "INDIVIDUAL" ? "Bireysel ilan sahibi" : listing.agency?.name}
-                  </p>
-                  {listing.channel !== "INDIVIDUAL" && listing.agency?.slug && (
-                    <Link href={`/sahibinden/agency/${listing.agency.slug}`} className="text-xs font-semibold text-amber-600 hover:underline">
-                      Mağazadaki tüm ilanlar →
-                    </Link>
-                  )}
-                  {listing.channel === "INDIVIDUAL" && listing.ownerUserId && (
-                    <Link href={`/sahibinden/uye/${listing.ownerUserId}`} className="mt-0.5 flex items-center gap-1.5 hover:underline">
-                      <StarRating value={sellerRating.avg} count={sellerRating.count} />
-                    </Link>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-3 space-y-2">
-                <ContactReveal phone={agent?.phone || property?.ownerPhone} name={agent ? `${agent.firstName} ${agent.lastName}` : property?.ownerName} />
-                {!isOwnListing && (
-                  <MessageButton listingId={id} listingTitle={listing.title} loggedIn={!!marketUser} />
+                {listing.acceptsSwap && (
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                    🔄 Takasa açık
+                  </span>
                 )}
-                <FavoriteButton listingId={id} initial={isFav} variant="button" />
-                <CompareButton listingId={id} variant="button" />
-                <ReportButton listingId={id} loggedIn={!!marketUser} />
+                {listing.securePayment && (
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                    🛡️ Güvenli ödeme
+                  </span>
+                )}
               </div>
-            </div>
+            )}
 
-            {/* Talep formu */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <InquiryForm listingId={id} listingTitle={listing.title} allowOffer={listing.isNegotiable} />
-            </div>
+            {priceHistory.length > 0 && (
+              <details className="mt-3 rounded-lg bg-gray-50 p-2 text-xs">
+                <summary className="cursor-pointer font-semibold text-gray-600">
+                  Fiyat geçmişi ({priceHistory.length})
+                </summary>
+                <ul className="mt-2 space-y-1">
+                  {priceHistory.map((h) => (
+                    <li key={h.id} className="flex items-center justify-between text-gray-500">
+                      <span>{formatDate(h.createdAt)}</span>
+                      <span className={h.newPrice < h.oldPrice ? "text-green-600" : "text-red-500"}>
+                        {formatPrice(h.oldPrice, h.currency)} → {formatPrice(h.newPrice, h.currency)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
 
-            {/* Kredi hesaplama (satılık) */}
-            {!isRent && listing.askingPrice > 0 && (
-              <MortgageCalculator price={listing.askingPrice} currency={listing.currency ?? "TRY"} />
+            {isOwner && (
+              <Link
+                href={`/sahibinden/ilan/${listing.id}/duzenle`}
+                className="mt-3 block w-full rounded-lg border border-gray-300 py-2 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                İlanı Düzenle
+              </Link>
+            )}
+
+            <div className="mt-3">
+              <CompareButton listingId={listing.id} />
+            </div>
+          </div>
+
+          {isEmlak && (
+            <AppointmentForm listingId={listing.id} isOwner={isOwner} isLoggedIn={!!user} />
+          )}
+          {isEmlak && listing.type === "SALE" && (
+            <DepositButton
+              listingId={listing.id}
+              isOwner={isOwner}
+              isLoggedIn={!!user}
+              suggested={Math.max(1000, Math.round(listing.price * 0.02))}
+            />
+          )}
+
+          {listing.store && (
+            <Link
+              href={`/sahibinden/magaza/${listing.store.slug}`}
+              className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 transition hover:border-yellow-400"
+            >
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                {listing.store.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={listing.store.logo} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-lg font-bold text-gray-600">
+                    {listing.store.name[0]?.toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-1 truncate text-sm font-semibold text-gray-800">
+                  {listing.store.name}
+                  {listing.store.isVerified && <span className="text-blue-600">✓</span>}
+                </p>
+                <p className="text-xs text-gray-600">Mağaza vitrinini gör →</p>
+              </div>
+            </Link>
+          )}
+
+          <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-3 text-sm">
+            <span className="text-gray-600">Satıcı puanı</span>
+            <span className="flex items-center gap-1">
+              <Stars value={sellerRating.avg} size={14} />
+              <span className="font-semibold text-gray-700">{sellerRating.avg.toFixed(1)}</span>
+              <span className="text-gray-600">({sellerRating.count})</span>
+            </span>
+          </div>
+
+          <ContactSeller
+            listingId={listing.id}
+            phone={listing.contactPhone}
+            showPhone={listing.showPhone}
+            contactName={listing.contactName || listing.user.displayName || listing.user.name}
+            isOwner={isOwner}
+            isLoggedIn={!!user}
+          />
+        </div>
+      </div>
+
+      {/* Özellikler */}
+      {attrEntries.length > 0 && (
+        <section className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="mb-3 text-lg font-bold text-gray-800">İlan Bilgileri</h2>
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+            {attrEntries.map(([k, v]) => (
+              <div key={k} className="flex justify-between border-b border-gray-50 py-2 text-sm">
+                <dt className="text-gray-500">{ATTR_LABELS[k] ?? k}</dt>
+                <dd className="font-medium text-gray-800">{attrValue(v)}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-3 text-xs text-gray-600">İlan tarihi: {formatDate(listing.createdAt)}</p>
+        </section>
+      )}
+
+      {/* Emlak detaylı özellik matrisi */}
+      {isEmlak && emlakFeatures && (
+        <div className="mt-5">
+          <EmlakFeaturesView features={emlakFeatures} />
+        </div>
+      )}
+
+      {/* Bölge fiyat analizi */}
+      {regionStats && (
+        <section className="mt-5 rounded-xl border border-gray-200 bg-white p-4">
+          <h2 className="mb-3 text-lg font-bold text-gray-800">📊 Bölge Fiyat Analizi</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label={`${listing.city} Ort. Fiyat`} value={formatPrice(regionStats.avgPrice, listing.currency)} />
+            {regionStats.avgPerM2 && (
+              <Stat label="Ort. m² Fiyatı" value={formatPrice(regionStats.avgPerM2, listing.currency)} />
+            )}
+            <Stat
+              label="Bu İlan"
+              value={formatPrice(listing.price, listing.currency)}
+              tone={listing.price <= regionStats.avgPrice ? "good" : "bad"}
+            />
+            {grossArea > 0 && regionStats.avgPerM2 && (
+              <Stat label="Tahmini Değer" value={formatPrice(regionStats.avgPerM2 * grossArea, listing.currency)} />
             )}
           </div>
-        </aside>
+          <p className="mt-2 text-xs text-gray-600">
+            {regionStats.count} benzer ilana göre hesaplanmıştır.{" "}
+            {listing.price <= regionStats.avgPrice
+              ? "Bu ilan bölge ortalamasının altında veya yakınında. 👍"
+              : "Bu ilan bölge ortalamasının üzerinde."}
+          </p>
+        </section>
+      )}
+
+      {/* Kredi hesaplama (emlak satılık) */}
+      {isEmlak && listing.type === "SALE" && (
+        <div className="mt-5">
+          <MortgageCalculator price={listing.price} currency={listing.currency} />
+        </div>
+      )}
+
+      {/* Satıcı değerlendirmeleri */}
+      <div className="mt-6">
+        <ReviewSection
+          targetUserId={listing.userId}
+          storeId={listing.store?.id}
+          reviews={sellerReviewDto}
+          avg={sellerRating.avg}
+          count={sellerRating.count}
+          canReview={!!user && !isOwner}
+          isLoggedIn={!!user}
+        />
       </div>
 
       {/* Benzer ilanlar */}
       {similar.length > 0 && (
-        <section className="mt-10">
-          <h2 className="mb-3 text-lg font-extrabold text-slate-900">Benzer İlanlar</h2>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {similar.slice(0, 4).map((l) => <ListingCard key={l.id} listing={l} favorited={favIds.includes(l.id)} />)}
+        <section className="mt-6">
+          <h2 className="mb-3 text-lg font-bold text-gray-800">Benzer İlanlar</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {similar.map((l) => (
+              <ListingCard key={l.id} listing={l} favorited={favIds.has(l.id)} />
+            ))}
           </div>
         </section>
       )}
+    </div>
+  );
+}
 
-      {/* Son gezilenler */}
-      <div className="mt-10">
-        <RecentlyViewed excludeId={id} />
-      </div>
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "good" | "bad";
+}) {
+  const color = tone === "good" ? "text-green-700" : tone === "bad" ? "text-red-600" : "text-gray-800";
+  return (
+    <div className="rounded-lg bg-gray-50 p-3">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className={`text-sm font-bold ${color}`}>{value}</p>
     </div>
   );
 }

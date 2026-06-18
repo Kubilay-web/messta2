@@ -1,23 +1,33 @@
-import { PlusCircle } from "lucide-react";
-import type { Metadata } from "next";
-import ListingFormClient from "../components/ListingFormClient";
-import { requireMarketUser } from "../lib/auth";
+import { redirect } from "next/navigation";
+import { validateRequest } from "@/app/auth";
+import prisma from "@/app/lib/prisma";
+import { getCategoryTree, getUserStore } from "../data";
+import ListingForm from "../components/listing-form";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Ücretsiz İlan Ver — sahibinden" };
 
-export default async function CreateListingPage() {
-  const user = await requireMarketUser();
+export default async function IlanVerPage() {
+  const { user } = await validateRequest();
+  if (!user) redirect("/login?redirect=/sahibinden/ilan-ver");
+
+  const [categories, dbUser, store] = await Promise.all([
+    getCategoryTree(),
+    prisma.user.findUnique({ where: { id: user.id }, select: { displayName: true, name: true, phone: true } }),
+    getUserStore(user.id),
+  ]);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:py-8">
-      <div className="mb-5">
-        <h1 className="flex items-center gap-2 text-2xl font-black tracking-tight sm:text-3xl">
-          <PlusCircle className="h-6 w-6 text-amber-500" /> Ücretsiz İlan Ver
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">Mülkünüzün bilgilerini girin; saniyeler içinde yayına hazır.</p>
-      </div>
-      <ListingFormClient mode="create" initial={{ ownerName: user.name ?? undefined }} />
+    <div className="mx-auto max-w-4xl">
+      <h1 className="mb-1 text-2xl font-bold text-gray-800">Ücretsiz İlan Ver</h1>
+      <p className="mb-5 text-sm text-gray-500">Birkaç adımda ilanını yayınla.</p>
+      <ListingForm
+        categories={categories}
+        userStore={store ? { id: store.id, name: store.name } : null}
+        defaultContact={{
+          name: dbUser?.displayName || dbUser?.name || user.displayName || "",
+          phone: dbUser?.phone || "",
+        }}
+      />
     </div>
   );
 }

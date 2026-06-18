@@ -1,0 +1,49 @@
+import { validateRequest } from "@/app/auth";
+import { getOwnerAppointments, getRequesterAppointments } from "../../data";
+import AppointmentRow from "../../components/appointment-row";
+
+export const dynamic = "force-dynamic";
+
+export default async function RandevularPage() {
+  const { user } = await validateRequest();
+  if (!user) return null;
+
+  const [incoming, outgoing] = await Promise.all([
+    getOwnerAppointments(user.id),
+    getRequesterAppointments(user.id),
+  ]);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="mb-3 text-xl font-bold text-gray-800">Gelen Randevu Talepleri ({incoming.length})</h1>
+        {incoming.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center text-gray-500">
+            İlanlarınıza henüz randevu talebi yok.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {incoming.map((a) => (
+              <AppointmentRow key={a.id} appt={a} role="owner" />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-lg font-bold text-gray-800">Aldığım Randevular ({outgoing.length})</h2>
+        {outgoing.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-center text-gray-500">
+            Henüz randevu talebiniz yok.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {outgoing.map((a) => (
+              <AppointmentRow key={a.id} appt={a} role="requester" />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

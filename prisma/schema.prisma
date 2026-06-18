@@ -265,6 +265,27 @@ model User {
 
   //
 
+  // Sahibinden
+  shListings       ShListing[]     @relation("ShUserListings")
+  shFavorites      ShFavorite[]    @relation("ShUserFavorites")
+  shSentMessages   ShMessage[]     @relation("ShSentMessages")
+  shReceivedMsgs   ShMessage[]     @relation("ShReceivedMessages")
+  shReports        ShReport[]      @relation("ShUserReports")
+  shSavedSearches  ShSavedSearch[] @relation("ShUserSavedSearches")
+  shStores         ShStore[]       @relation("ShStoreOwner")
+  shNotifications  ShNotification[] @relation("ShUserNotifications")
+  shReviewsWritten ShReview[]      @relation("ShReviewAuthor")
+  shReviewsGot     ShReview[]      @relation("ShReviewTarget")
+  shConvsAsBuyer   ShConversation[] @relation("ShConvBuyer")
+  shConvsAsSeller  ShConversation[] @relation("ShConvSeller")
+  shRecentViews    ShRecentView[]  @relation("ShUserRecentViews")
+  shPayments       ShPayment[]     @relation("ShUserPayments")
+  shDopings        ShListingDoping[] @relation("ShUserDopings")
+  shApptRequested  ShViewingAppointment[] @relation("ShApptRequester")
+  shApptOwned      ShViewingAppointment[] @relation("ShApptOwner")
+  shDepositsBuyer  ShDeposit[]     @relation("ShDepositBuyer")
+  //
+
   @@map("users")
 }
 
@@ -4225,8 +4246,7 @@ model Agency {
   crmTasks      CrmTask[]
   crmActivities CrmActivity[]
 
-  // Proje Yönetimi
-  estateProjects EstateProject[]
+
 
   // Gelişmiş ERP (teklif, muhasebe, kira, iletişim)
   offers              PropertyOffer[]
@@ -4440,30 +4460,6 @@ model PropertyRealEstate {
   description   String?
   notes         String?
 
-  // --- Gelişmiş emlak detayları (sahibinden paritesi) ---
-  subType         String? // Alt tip: RESIDENCE, MUSTAKIL, YAZLIK, CIFTLIK_EVI, IMARLI, TARLA ...
-  dues            Float? // Aidat (₺/ay)
-  facing          String[] // Cephe/yön: NORTH, SOUTH, EAST, WEST
-  deedStatus      String? // Tapu durumu: KAT_MULKIYETI, KAT_IRTIFAKI, HISSELI, ARSA_TAPULU, MUSTAKIL_TAPULU
-  buildStatus     String? // Yapı durumu: ZERO (sıfır), SECOND_HAND, UNDER_CONSTRUCTION
-  structureType   String? // Yapı tipi: BETONARME, CELIK, AHSAP, PREFABRIK, KAGIR
-  usageStatus     String? // Kullanım durumu: EMPTY, TENANT, OWNER
-  furnishStatus   String? // Eşya durumu: FURNISHED, UNFURNISHED (isFurnished ile uyumlu)
-  inSite          Boolean  @default(false) // Site içerisinde
-  siteName        String? // Site adı
-  creditEligible  Boolean  @default(false) // Krediye uygun
-  swappable       Boolean  @default(false) // Takaslı
-  accessible      Boolean  @default(false) // Engelliye uygun
-  facadeCount     Int? // Cephe sayısı (arsa)
-  features        String[] // Gruplu donanım/özellik anahtarları (lib/features.ts)
-
-  // Arsa / imar
-  zoningStatus String? // İmar durumu: KONUT, TICARI, SANAYI, TARLA, BAG_BAHCE, IMARSIZ ...
-  blockNo      String? // Ada
-  parcelNo     String? // Parsel
-  kaks         String? // KAKS / Emsal
-  gabari       String? // Gabari (kat yüksekliği)
-
   // Mülk sahibi: kayıtlı müşteriye (satıcı/mülk sahibi) bağlanabilir.
   // ownerName/ownerPhone/ownerNIN, ownerId yoksa veya snapshot için tutulur.
   ownerId    String?
@@ -4519,29 +4515,11 @@ model MarketFavorite {
   userId    String
   listingId String
   listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  folder    String? // kullanıcı favori klasörü ("Beğendiklerim" vb.)
-  priceAtSave Float? // kaydedildiği andaki fiyat → "fiyatı düştü" bildirimi için
   createdAt DateTime @default(now())
 
   @@unique([userId, listingId])
   @@index([userId])
   @@map("market-favorites")
-}
-
-// Üye telefon doğrulama (SMS kodu) → "Onaylı İlan"
-model MarketPhoneVerification {
-  id         String    @id @default(cuid()) @map("_id")
-  userId     String    @unique
-  phone      String
-  code       String // 6 haneli kod (gerçek SMS sağlayıcısı entegre edilince gönderilir)
-  verified   Boolean   @default(false)
-  attempts   Int       @default(0)
-  expiresAt  DateTime
-  verifiedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  @@map("market-phone-verifications")
 }
 
 // Ziyaretçinin kaydettiği arama kriterleri
@@ -4556,8 +4534,6 @@ model MarketSavedSearch {
   maxPrice     Float?
   rooms        String?
   q            String?
-  notify         Boolean   @default(true) // eşleşen yeni ilanlarda e-posta gönder
-  lastNotifiedAt DateTime? // en son bildirim zamanı (tekrarı önlemek için)
   createdAt    DateTime @default(now())
 
   @@index([userId])
@@ -4576,23 +4552,17 @@ model Listing {
   channel          ListingChannel    @default(AGENCY)
   ownerUserId      String? // INDIVIDUAL ilanlarda ilanı veren User
   moderationStatus ListingModeration @default(APPROVED) // bireysel ilanlar PENDING başlar
-  featuredUntil    DateTime? // ücretli öne çıkarma (vitrin) bitiş tarihi
-  urgentUntil      DateTime? // "Acil" doping bitiş tarihi
-  highlightUntil   DateTime? // renkli çerçeve doping bitiş tarihi
-  showcaseUntil    DateTime? // "üst sıralarda / showcase" doping bitiş tarihi
-  verified         Boolean   @default(false) // telefon doğrulanmış → "Onaylı İlan" rozeti
+  featuredUntil    DateTime? // ücretli öne çıkarma bitiş tarihi
   videoUrl         String? // tanıtım videosu
   virtualTourUrl   String? // 360° sanal tur linki
 
-  askingPrice   Float
-  previousPrice Float? // bir önceki fiyat ("fiyat düştü" rozeti için)
-  currency      String  @default("TRY")
-  monthlyRent   Float? // Aylık kira (kiralık ilanlar için)
-  deposit       Float? // Depozito
-  isNegotiable  Boolean @default(true)
+  askingPrice  Float
+  currency     String  @default("TRY")
+  monthlyRent  Float? // Aylık kira (kiralık ilanlar için)
+  deposit      Float? // Depozito
+  isNegotiable Boolean @default(true)
 
   publishedAt DateTime?
-  bumpedAt    DateTime? // "yenile/öne al" zamanı (sıralama için)
   expiresAt   DateTime?
   isPublic    Boolean   @default(true)
   views       Int       @default(0)
@@ -4622,10 +4592,7 @@ model Listing {
   communicationLogs CommunicationLog[]
 
   // Pazar yeri
-  favorites    MarketFavorite[]
-  threads      MarketThread[]
-  reports      ListingReport[]
-  priceHistory ListingPriceHistory[]
+  favorites MarketFavorite[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4637,150 +4604,6 @@ model Listing {
   @@index([listingType])
   @@index([ownerUserId])
   @@map("listings")
-}
-
-// Üye ↔ ilan sahibi çift yönlü mesajlaşma kanalı
-model MarketThread {
-  id           String  @id @default(cuid()) @map("_id")
-  listingId    String
-  listing      Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  listingTitle String
-
-  buyerUserId String // mesajı başlatan üye (User)
-  buyerName   String
-  ownerUserId String? // ilan sahibi User (bireysel ilanlarda)
-  agencyId    String // ofis ilanlarında talebin gittiği ofis
-
-  lastMessageAt DateTime @default(now())
-  buyerUnread   Int      @default(0)
-  ownerUnread   Int      @default(0)
-
-  messages  MarketMessage[]
-  createdAt DateTime @default(now())
-
-  @@index([listingId])
-  @@index([buyerUserId])
-  @@index([ownerUserId])
-  @@index([agencyId])
-  @@map("market-threads")
-}
-
-model MarketMessage {
-  id           String       @id @default(cuid()) @map("_id")
-  threadId     String
-  thread       MarketThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  senderUserId String
-  senderRole   String // "BUYER" | "OWNER"
-  body         String
-  readAt       DateTime?
-  createdAt    DateTime     @default(now())
-
-  @@index([threadId])
-  @@map("market-messages")
-}
-
-// İlan şikayet / raporlama
-model ListingReport {
-  id             String  @id @default(cuid()) @map("_id")
-  listingId      String
-  listing        Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  reporterUserId String?
-  reporterName   String?
-  reason         String // SPAM | FRAUD | WRONG_INFO | SOLD | DUPLICATE | OFFENSIVE | OTHER
-  details        String?
-  status         String  @default("OPEN") // OPEN | REVIEWED | DISMISSED
-  createdAt      DateTime @default(now())
-
-  @@index([listingId])
-  @@index([status])
-  @@map("listing-reports")
-}
-
-// İlan fiyat geçmişi
-model ListingPriceHistory {
-  id        String   @id @default(cuid()) @map("_id")
-  listingId String
-  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  price     Float
-  currency  String   @default("TRY")
-  createdAt DateTime @default(now())
-
-  @@index([listingId])
-  @@map("listing-price-history")
-}
-
-// Pazar yeri uygulama içi bildirimleri (üye = User, ilişkisiz scalar userId)
-model MarketNotification {
-  id        String    @id @default(cuid()) @map("_id")
-  userId    String
-  type      String // MESSAGE | LISTING_APPROVED | LISTING_REJECTED | SAVED_SEARCH | INQUIRY | SYSTEM
-  title     String
-  body      String?
-  link      String? // tıklayınca gidilecek yol
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@index([userId])
-  @@index([userId, readAt])
-  @@map("market-notifications")
-}
-
-// Kurumsal/bireysel üyelik (kontör + ilan kotası)
-model MarketMembership {
-  id              String    @id @default(cuid()) @map("_id")
-  userId          String    @unique
-  plan            String // FREE | BIREYSEL_PLUS | PRO | KURUMSAL
-  status          String    @default("ACTIVE") // ACTIVE | EXPIRED | CANCELLED
-  creditsRemaining Int      @default(0) // doping vb. için kontör
-  listingQuota    Int       @default(0) // aktif ilan kotası (0 = sınırsız sayılmaz; plana göre)
-  startedAt       DateTime  @default(now())
-  expiresAt       DateTime?
-  updatedAt       DateTime  @updatedAt
-
-  @@map("market-memberships")
-}
-
-// İlan günlük istatistiği (görüntülenme zaman serisi → satıcı analitiği)
-model ListingStatDaily {
-  id        String   @id @default(cuid()) @map("_id")
-  listingId String
-  day       String // "YYYY-MM-DD"
-  views     Int      @default(0)
-  createdAt DateTime @default(now())
-
-  @@unique([listingId, day])
-  @@index([listingId])
-  @@map("listing-stat-daily")
-}
-
-// Satıcı (üye) değerlendirmesi & puanı
-model SellerReview {
-  id           String   @id @default(cuid()) @map("_id")
-  targetUserId String // değerlendirilen ilan sahibi (User)
-  authorUserId String // değerlendiren üye (User)
-  authorName   String
-  rating       Int // 1-5
-  comment      String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@unique([targetUserId, authorUserId])
-  @@index([targetUserId])
-  @@map("seller-reviews")
-}
-
-// Kontör hareketleri (satın alma / harcama)
-model MarketCreditTxn {
-  id           String   @id @default(cuid()) @map("_id")
-  userId       String
-  delta        Int // + yükleme, - harcama
-  balanceAfter Int
-  reason       String // PURCHASE | MEMBERSHIP_GRANT | DOPING | REFUND
-  note         String?
-  createdAt    DateTime @default(now())
-
-  @@index([userId])
-  @@map("market-credit-txns")
 }
 
 // PropertyContract → Marksheet + SchoolFeePayment karşılığı (Sözleşme)
@@ -5973,440 +5796,598 @@ model CrmTask {
   @@map("crm-tasks")
 }
 
-// ============================================================
-// ========  GAYRİMENKUL PROJE YÖNETİMİ (ERP üstü)  ===========
-// ============================================================
 
-enum EstateProjectType {
-  RESIDENTIAL // Konut
-  COMMERCIAL // Ticari
-  MIXED_USE // Karma kullanım
-  INDUSTRIAL // Sanayi
-  LAND // Arsa geliştirme
-}
 
-enum EstateProjectStatus {
-  PLANNING // Planlama
-  PRESALE // Ön satış
-  UNDER_CONSTRUCTION // İnşaat halinde
-  COMPLETED // Tamamlandı
-  DELIVERED // Teslim edildi
-  ON_HOLD // Beklemede
-  CANCELLED // İptal
-}
 
-enum ProjectUnitStatus {
-  AVAILABLE // Müsait
-  RESERVED // Rezerve
+
+
+
+//Sahibinden
+// =====================================================================
+//  SAHIBINDEN — Classifieds Marketplace (yeni şema, login/register'a bağlı)
+// =====================================================================
+
+enum ShListingStatus {
+  DRAFT // Taslak
+  PENDING // Onay bekliyor
+  ACTIVE // Yayında
+  PASSIVE // Pasif / yayından kaldırıldı
   SOLD // Satıldı
-  BLOCKED // Bloke / satışa kapalı
-  DELIVERED // Teslim edildi
+  REJECTED // Reddedildi
+  EXPIRED // Süresi doldu
 }
 
-enum ProjectPhaseStatus {
-  NOT_STARTED // Başlamadı
-  IN_PROGRESS // Devam ediyor
-  COMPLETED // Tamamlandı
-  DELAYED // Gecikti
-  ON_HOLD // Durduruldu
+enum ShListingType {
+  SALE // Satılık
+  RENT // Kiralık
+  DAILY_RENT // Günlük Kiralık
+  EXCHANGE // Takas
+  WANTED // Aranıyor
 }
 
-enum ProjectTaskStatus {
-  TODO
-  IN_PROGRESS
-  DONE
-  BLOCKED
+enum ShCurrency {
+  TRY
+  USD
+  EUR
+  GBP
 }
 
-enum ProjectTaskPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
+/// Hiyerarşik kategori ağacı (Emlak > Konut > Satılık Daire ...)
+model ShCategory {
+  id       String  @id @default(cuid()) @map("_id")
+  name     String
+  slug     String  @unique
+  icon     String?
+  order    Int     @default(0)
+  featured Boolean @default(false)
+
+  parentId String?
+  parent   ShCategory?  @relation("ShCategoryTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children ShCategory[] @relation("ShCategoryTree")
+
+  listings ShListing[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([featured])
+  @@map("sh_categories")
 }
 
-enum ProjectMilestoneStatus {
-  PENDING
-  REACHED
-  MISSED
-}
+/// İlan
+model ShListing {
+  id          String @id @default(cuid()) @map("_id")
+  listingNo   Int    @unique // Sahibinden ilan numarası
+  title       String
+  slug        String
+  description String
 
-enum ProjectExpenseCategory {
-  LAND // Arsa
-  CONSTRUCTION // İnşaat
-  LABOR // İşçilik
-  MATERIAL // Malzeme
-  PERMIT // Ruhsat / izin
-  MARKETING // Pazarlama
-  LEGAL // Hukuk
-  FINANCE // Finansman
-  OTHER
-}
+  price    Float
+  currency ShCurrency @default(TRY)
 
-enum ProjectExpenseStatus {
-  PLANNED // Planlandı
-  COMMITTED // Taahhüt edildi
-  PAID // Ödendi
-}
+  type   ShListingType   @default(SALE)
+  status ShListingStatus @default(ACTIVE)
 
-enum UnitSaleStatus {
-  RESERVATION // Ön rezervasyon / kapora
-  CONTRACT // Sözleşme imzalandı
-  COMPLETED // Tamamlandı (tapu devri)
-  CANCELLED // İptal
-}
+  categoryId String
+  category   ShCategory @relation(fields: [categoryId], references: [id])
 
-// Geliştirme / inşaat projesi (örn. "Marina Residence")
-model EstateProject {
-  id          String  @id @default(cuid()) @map("_id")
-  name        String
-  slug        String  @unique
-  code        String? // Proje kodu
-  description String?
+  userId String
+  user   User   @relation("ShUserListings", fields: [userId], references: [id], onDelete: Cascade)
 
-  type   EstateProjectType
-  status EstateProjectStatus @default(PLANNING)
+  // Kurumsal mağaza / galeri / emlak ofisi (opsiyonel)
+  storeId String?
+  store   ShStore? @relation(fields: [storeId], references: [id], onDelete: SetNull)
 
-  // Konum
-  address      String?
-  city         String
+  // İlişkisel lokasyon (opsiyonel — geriye uyum için string alanlar korunur)
+  locationId String?
+  location   ShLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  city         String?
   district     String?
   neighborhood String?
+  address      String?
   latitude     Float?
   longitude    Float?
 
-  // Tarihler
-  startDate        DateTime?
-  estimatedEndDate DateTime?
-  actualEndDate    DateTime?
-  deliveryDate     DateTime?
+  images String[] @default([])
 
-  // Finans
-  budget   Float?
-  currency String @default("TRY")
+  // Emlak medya (gelişmiş)
+  floorPlans   String[] @default([]) // Kat planı görselleri
+  videoUrl     String? // Video tur (YouTube/Vimeo)
+  tourImageUrl String? // 360° panorama görseli
 
-  // Alanlar
-  totalLandArea         Float? // Arsa alanı (m²)
-  totalConstructionArea Float? // Toplam inşaat alanı (m²)
-  totalBlocks           Int?
-  totalFloors           Int?
+  /// Kategoriye özel özellikler (m², oda sayısı, km, model yılı, vb.)
+  attributes Json?
 
-  // Medya & ilerleme
-  coverImage String?
-  progress   Int     @default(0) // İnşaat ilerlemesi (%)
-  isFeatured Boolean @default(false)
+  // Durum / ticaret seçenekleri
+  condition     String? // Sıfır / İkinci El
+  isNegotiable  Boolean @default(false) // Pazarlık payı var
+  acceptsSwap   Boolean @default(false) // Takasa açık
+  securePayment Boolean @default(false) // Güvenli ödeme / kapora
 
-  // Proje yöneticisi (danışman)
-  managerName String?
+  // Doping bayrakları + bitiş tarihleri
+  isUrgent       Boolean   @default(false) // Acil
+  isFeatured     Boolean   @default(false) // Öne çıkan
+  isShowcase     Boolean   @default(false) // Vitrin
+  urgentUntil    DateTime?
+  featuredUntil  DateTime?
+  showcaseUntil  DateTime?
+  bumpedAt       DateTime? // İlanı güncelle/öne al
+  isActive       Boolean   @default(true)
 
-  agencyId String
-  agency   Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  viewCount     Int @default(0)
+  favoriteCount Int @default(0)
+  messageCount  Int @default(0)
 
-  blocks      ProjectBlock[]
-  units       ProjectUnit[]
-  sales       UnitSale[]
-  phases      ProjectPhase[]
-  milestones  ProjectMilestone[]
-  tasks       ProjectTask[]
-  expenses    ProjectExpense[]
-  contractors ProjectContractor[]
-  documents   ProjectDocument[]
-  images      ProjectImage[]
-  updates     ProjectUpdate[]
+  contactName  String?
+  contactPhone String?
+  showPhone    Boolean @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  @@index([agencyId])
-  @@map("estate-projects")
+  favorites     ShFavorite[]
+  messages      ShMessage[]
+  reports       ShReport[]
+  priceHistory  ShPriceHistory[]
+  dopings       ShListingDoping[]
+  conversations ShConversation[]
+  recentViews   ShRecentView[]
+  reviews       ShReview[]
+  appointments  ShViewingAppointment[]
+  deposits      ShDeposit[]
+
+  @@index([categoryId])
+  @@index([userId])
+  @@index([storeId])
+  @@index([locationId])
+  @@index([status])
+  @@index([type])
+  @@index([city])
+  @@index([createdAt])
+  @@index([isShowcase])
+  @@index([isFeatured])
+  @@map("sh_listings")
 }
 
-// Blok / Etap (örn. "A Blok")
-model ProjectBlock {
-  id            String  @id @default(cuid()) @map("_id")
-  name          String
-  code          String?
-  floors        Int?
-  unitsPerFloor Int?
-  description   String?
-  progress      Int     @default(0) // İnşaat ilerlemesi (%)
+/// Favoriler
+model ShFavorite {
+  id        String    @id @default(cuid()) @map("_id")
+  userId    String
+  user      User      @relation("ShUserFavorites", fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   ShListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
 
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  units ProjectUnit[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([projectId])
-  @@map("estate-project-blocks")
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+  @@map("sh_favorites")
 }
 
-// Bağımsız bölüm (daire / dükkan / ofis)
-model ProjectUnit {
-  id     String @id @default(cuid()) @map("_id")
-  unitNo String // "A-12", "Daire 5"
+/// İlan üzerinden mesajlaşma
+model ShMessage {
+  id        String    @id @default(cuid()) @map("_id")
+  listingId String
+  listing   ShListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
-  type   PropertyType
-  status ProjectUnitStatus @default(AVAILABLE)
+  conversationId String?
+  conversation   ShConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  floor       Int?
-  roomCount   String? // "3+1"
-  grossArea   Float?
-  netArea     Float?
-  balconyArea Float?
-  facing      String? // Cephe (Güney, Deniz vb.)
-  listPrice   Float?
-  currency    String   @default("TRY")
+  senderId   String
+  sender     User   @relation("ShSentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User   @relation("ShReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  content String
+  isRead  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([listingId])
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("sh_messages")
+}
+
+enum ShReportStatus {
+  OPEN // İncelenmedi
+  REVIEWING // İnceleniyor
+  RESOLVED // Çözüldü
+  DISMISSED // Reddedildi
+}
+
+/// İlan şikayeti
+model ShReport {
+  id          String         @id @default(cuid()) @map("_id")
+  listingId   String
+  listing     ShListing      @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User           @relation("ShUserReports", fields: [userId], references: [id], onDelete: Cascade)
+  reason      String
   description String?
-  features    String[]
-  isFeatured  Boolean  @default(false)
+  status      ShReportStatus @default(OPEN)
+  adminNote   String?
+  createdAt   DateTime       @default(now())
 
-  agencyId String // kapsam kolaylığı için denormalize
+  @@index([listingId])
+  @@index([status])
+  @@map("sh_reports")
+}
 
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+/// Kayıtlı aramalar
+model ShSavedSearch {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String
+  user      User     @relation("ShUserSavedSearches", fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  query     Json
+  createdAt DateTime @default(now())
 
-  blockId String?
-  block   ProjectBlock? @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  @@index([userId])
+  @@map("sh_saved_searches")
+}
 
-  sales UnitSale[]
+// =====================================================================
+//  SAHIBINDEN — Kurumsal / Gelişmiş modüller
+// =====================================================================
+
+enum ShStoreType {
+  INDIVIDUAL // Bireysel
+  CORPORATE // Kurumsal mağaza
+  CAR_GALLERY // Oto galeri
+  REAL_ESTATE_OFFICE // Emlak ofisi
+  AUTHORIZED_DEALER // Yetkili bayi
+}
+
+/// Kurumsal mağaza / galeri / emlak ofisi
+model ShStore {
+  id          String      @id @default(cuid()) @map("_id")
+  ownerId     String
+  owner       User        @relation("ShStoreOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String      @unique
+  type        ShStoreType @default(CORPORATE)
+  logo        String?
+  banner      String?
+  about       String?
+  phone       String?
+  email       String?
+  website     String?
+  address     String?
+  city        String?
+  taxOffice   String?
+  taxNumber   String?
+  memberSince DateTime    @default(now())
+  isVerified  Boolean     @default(false)
+  rating      Float       @default(0)
+  reviewCount Int         @default(0)
+  followerCount Int       @default(0)
+
+  listings ShListing[]
+  reviews  ShReview[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([projectId])
-  @@index([blockId])
-  @@index([agencyId])
-  @@map("estate-project-units")
+  @@index([ownerId])
+  @@index([type])
+  @@map("sh_stores")
 }
 
-// Bağımsız bölüm satışı (ERP müşteri/danışmanına bağlı)
-model UnitSale {
-  id     String         @id @default(cuid()) @map("_id")
-  status UnitSaleStatus @default(RESERVATION)
+enum ShLocationType {
+  CITY // İl
+  DISTRICT // İlçe
+  NEIGHBORHOOD // Mahalle
+}
 
-  salePrice   Float
-  currency    String    @default("TRY")
-  downPayment Float? // Peşinat / kapora
-  commission  Float?
-  saleDate    DateTime?
-  notes       String?
-
-  unitId String
-  unit   ProjectUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
-
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  agencyId String
-
-  // ERP bağlantıları (id + denormalize ad)
-  clientId   String?
-  clientName String?
-  agentId    String?
-  agentName  String?
-
-  payments ProjectPayment[]
+/// İl / İlçe / Mahalle hiyerarşisi
+model ShLocation {
+  id        String         @id @default(cuid()) @map("_id")
+  name      String
+  slug      String
+  type      ShLocationType
+  plateCode Int? // İl plaka kodu
+  parentId  String?
+  parent    ShLocation?    @relation("ShLocationTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children  ShLocation[]   @relation("ShLocationTree")
+  listings  ShListing[]
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@index([projectId])
-  @@index([unitId])
-  @@index([agencyId])
-  @@map("estate-project-unit-sales")
+  @@index([parentId])
+  @@index([type])
+  @@map("sh_locations")
 }
 
-// Satış ödeme planı / taksitler
-model ProjectPayment {
-  id String @id @default(cuid()) @map("_id")
+enum ShAttrType {
+  TEXT
+  NUMBER
+  SELECT
+  BOOLEAN
+}
 
-  saleId String
-  sale   UnitSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
-
-  title         String
-  amount        Float
-  dueDate       DateTime
-  paidDate      DateTime?
-  status        PaymentStatusGayrimenkul @default(PENDING)
-  paymentMethod String?
-  receiptNo     String?
+/// Dinamik (admin tanımlı) kategori özellik şeması — filtreleri data-driven yapar
+model ShCategoryAttribute {
+  id         String     @id @default(cuid()) @map("_id")
+  categoryId String // Üst kategori slug'ına göre çözümlenir
+  key        String
+  label      String
+  type       ShAttrType @default(TEXT)
+  options    String[]   @default([])
+  unit       String?
+  filterable Boolean    @default(false)
+  required   Boolean    @default(false)
+  order      Int        @default(0)
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@index([saleId])
-  @@map("estate-project-payments")
+  @@index([categoryId])
+  @@map("sh_category_attributes")
 }
 
-// İnşaat fazı
-model ProjectPhase {
-  id            String             @id @default(cuid()) @map("_id")
-  name          String
-  description   String?
-  status        ProjectPhaseStatus @default(NOT_STARTED)
-  order         Int                @default(0)
-  progress      Int                @default(0)
-  startDate     DateTime?
-  endDate       DateTime?
-  plannedBudget Float?
-  actualCost    Float?
+enum ShDopingType {
+  SHOWCASE // Vitrin
+  FEATURED // Öne çıkan
+  URGENT // Acil
+  BUMP // Üste taşı
+  BOLD // Kalın yazı
+}
 
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+/// Doping paketleri (ücretli öne çıkarma)
+model ShDopingPackage {
+  id          String       @id @default(cuid()) @map("_id")
+  name        String
+  type        ShDopingType
+  durationDays Int         @default(7)
+  price       Float
+  currency    ShCurrency   @default(TRY)
+  active      Boolean      @default(true)
+  order       Int          @default(0)
 
-  tasks ProjectTask[]
+  dopings ShListingDoping[]
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@index([projectId])
-  @@map("estate-project-phases")
+  @@map("sh_doping_packages")
 }
 
-// Kilometre taşı
-model ProjectMilestone {
-  id          String                 @id @default(cuid()) @map("_id")
-  title       String
-  description String?
-  dueDate     DateTime?
-  status      ProjectMilestoneStatus @default(PENDING)
-  completedAt DateTime?
+enum ShDopingStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
 
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+/// Bir ilana uygulanan doping satın alımı
+model ShListingDoping {
+  id        String          @id @default(cuid()) @map("_id")
+  listingId String
+  listing   ShListing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  packageId String
+  package   ShDopingPackage @relation(fields: [packageId], references: [id])
+  userId    String
+  user      User            @relation("ShUserDopings", fields: [userId], references: [id], onDelete: Cascade)
+  paymentId String?
+  payment   ShPayment?      @relation(fields: [paymentId], references: [id])
+
+  status    ShDopingStatus @default(ACTIVE)
+  startsAt  DateTime       @default(now())
+  expiresAt DateTime
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@index([projectId])
-  @@map("estate-project-milestones")
+  @@index([listingId])
+  @@index([userId])
+  @@map("sh_listing_dopings")
 }
 
-// Proje görevi
-model ProjectTask {
-  id           String              @id @default(cuid()) @map("_id")
-  title        String
-  description  String?
-  status       ProjectTaskStatus   @default(TODO)
-  priority     ProjectTaskPriority @default(MEDIUM)
-  progress     Int                 @default(0)
-  dueDate      DateTime?
-  completedAt  DateTime?
-  assigneeName String?
-
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  phaseId String?
-  phase   ProjectPhase? @relation(fields: [phaseId], references: [id], onDelete: SetNull)
-
-  agencyId String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([projectId])
-  @@map("estate-project-tasks")
+enum ShPaymentType {
+  LISTING_FEE
+  DOPING
+  STORE_SUBSCRIPTION
+  DEPOSIT
 }
 
-// Müteahhit / taşeron
-model ProjectContractor {
-  id             String  @id @default(cuid()) @map("_id")
-  name           String
-  contactName    String?
-  phone          String?
-  email          String?
-  specialty      String? // "Elektrik", "Kaba inşaat" vb.
-  taxNumber      String?
-  contractAmount Float?
-  notes          String?
-
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([projectId])
-  @@map("estate-project-contractors")
+enum ShPaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
 }
 
-// Harcama kalemi
-model ProjectExpense {
-  id       String                 @id @default(cuid()) @map("_id")
-  title    String
-  category ProjectExpenseCategory @default(OTHER)
-  status   ProjectExpenseStatus   @default(PLANNED)
+/// Ödeme kayıtları (doping / ilan ücreti / mağaza aboneliği)
+model ShPayment {
+  id       String          @id @default(cuid()) @map("_id")
+  userId   String
+  user     User            @relation("ShUserPayments", fields: [userId], references: [id], onDelete: Cascade)
   amount   Float
-  currency String                 @default("TRY")
-  date     DateTime?
-  vendor   String?
-  notes    String?
+  currency ShCurrency      @default(TRY)
+  type     ShPaymentType   @default(DOPING)
+  status   ShPaymentStatus @default(PAID)
+  provider String? // iyzico / stripe / paypal vb.
+  refId    String? // sağlayıcı işlem no
+  meta     Json?
 
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  agencyId String
+  dopings  ShListingDoping[]
+  deposits ShDeposit[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([projectId])
-  @@map("estate-project-expenses")
+  @@index([userId])
+  @@index([status])
+  @@map("sh_payments")
 }
 
-// Proje dökümanı
-model ProjectDocument {
-  id String @id @default(cuid()) @map("_id")
+/// Mesajlaşma konuşması (ilan + alıcı + satıcı)
+model ShConversation {
+  id        String    @id @default(cuid()) @map("_id")
+  listingId String
+  listing   ShListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User      @relation("ShConvBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId  String
+  seller    User      @relation("ShConvSeller", fields: [sellerId], references: [id], onDelete: Cascade)
 
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  lastMessageAt DateTime @default(now())
+  buyerArchived  Boolean @default(false)
+  sellerArchived Boolean @default(false)
+  buyerUnread    Int     @default(0)
+  sellerUnread   Int     @default(0)
 
-  type       DocumentTypeGayrimenkul
-  title      String
-  url        String
-  size       Int?
-  uploadedAt DateTime                @default(now())
-
-  @@index([projectId])
-  @@map("estate-project-documents")
-}
-
-// Proje görseli / render
-model ProjectImage {
-  id String @id @default(cuid()) @map("_id")
-
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  url     String
-  title   String?
-  isCover Boolean @default(false)
-  order   Int     @default(0)
+  messages ShMessage[]
 
   createdAt DateTime @default(now())
 
-  @@index([projectId])
-  @@map("estate-project-images")
+  @@unique([listingId, buyerId, sellerId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@map("sh_conversations")
 }
 
-// Saha / ilerleme güncellemesi
-model ProjectUpdate {
-  id            String  @id @default(cuid()) @map("_id")
-  title         String
-  content       String?
-  progress      Int?
-  imageUrl      String?
-  createdByName String?
+enum ShNotificationType {
+  NEW_MESSAGE
+  LISTING_APPROVED
+  LISTING_REJECTED
+  PRICE_DROP
+  FAVORITE_SOLD
+  SAVED_SEARCH_MATCH
+  DOPING_EXPIRING
+}
 
-  projectId String
-  project   EstateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+/// Bildirimler
+model ShNotification {
+  id        String             @id @default(cuid()) @map("_id")
+  userId    String
+  user      User               @relation("ShUserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  type      ShNotificationType
+  title     String
+  body      String?
+  link      String?
+  listingId String?
+  isRead    Boolean            @default(false)
 
   createdAt DateTime @default(now())
 
-  @@index([projectId])
-  @@map("estate-project-updates")
+  @@index([userId])
+  @@index([isRead])
+  @@map("sh_notifications")
+}
+
+/// Satıcı / mağaza değerlendirmesi
+model ShReview {
+  id           String     @id @default(cuid()) @map("_id")
+  authorId     String
+  author       User       @relation("ShReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  targetUserId String
+  targetUser   User       @relation("ShReviewTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  storeId      String?
+  store        ShStore?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  listingId    String?
+  listing      ShListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  rating       Int // 1-5
+  comment      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([targetUserId])
+  @@index([storeId])
+  @@map("sh_reviews")
+}
+
+/// Fiyat değişim geçmişi
+model ShPriceHistory {
+  id        String     @id @default(cuid()) @map("_id")
+  listingId String
+  listing   ShListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  oldPrice  Float
+  newPrice  Float
+  currency  ShCurrency @default(TRY)
+  createdAt DateTime   @default(now())
+
+  @@index([listingId])
+  @@map("sh_price_history")
+}
+
+/// Son baktığın ilanlar
+model ShRecentView {
+  id        String    @id @default(cuid()) @map("_id")
+  userId    String
+  user      User      @relation("ShUserRecentViews", fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   ShListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  viewedAt  DateTime  @default(now())
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@map("sh_recent_views")
+}
+
+// =====================================================================
+//  SAHIBINDEN — Emlak (gelişmiş): randevu + kapora
+// =====================================================================
+
+enum ShAppointmentStatus {
+  PENDING // Talep edildi
+  CONFIRMED // Onaylandı
+  REJECTED // Reddedildi
+  CANCELLED // İptal
+  COMPLETED // Gerçekleşti
+}
+
+/// Emlak gezme randevusu
+model ShViewingAppointment {
+  id          String              @id @default(cuid()) @map("_id")
+  listingId   String
+  listing     ShListing           @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  requesterId String
+  requester   User                @relation("ShApptRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  ownerId     String
+  owner       User                @relation("ShApptOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  scheduledAt DateTime
+  note        String?
+  phone       String?
+  status      ShAppointmentStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([listingId])
+  @@index([requesterId])
+  @@index([ownerId])
+  @@map("sh_viewing_appointments")
+}
+
+enum ShDepositStatus {
+  PENDING // Ödeme bekliyor
+  HELD // Ödendi / emanette
+  RELEASED // Satıcıya aktarıldı
+  REFUNDED // İade edildi
+  CANCELLED // İptal
+}
+
+/// Kapora / ön ödeme (escrow-lite)
+model ShDeposit {
+  id        String          @id @default(cuid()) @map("_id")
+  listingId String
+  listing   ShListing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User            @relation("ShDepositBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId  String
+  amount    Float
+  currency  ShCurrency      @default(TRY)
+  status    ShDepositStatus @default(PENDING)
+  paymentId String?
+  payment   ShPayment?      @relation(fields: [paymentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([listingId])
+  @@index([buyerId])
+  @@map("sh_deposits")
 }
