@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { validateRequest } from "@/app/auth";
 import Header, { type HeaderUser } from "./components/header";
 import Footer from "./components/footer";
+import IncomingCallListener from "./components/incoming-call";
 import { getCategoryTree, getUnreadMessageCount, getUnreadNotificationCount } from "./data";
 
 export const metadata: Metadata = {
@@ -37,6 +38,7 @@ export default async function SahibindenLayout({
       <Header user={headerUser} categories={categories} unread={unread} notifUnread={notifUnread} />
       <main className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-4 sm:py-6">{children}</main>
       <Footer />
+      <IncomingCallListener enabled={!!user} />
     </div>
   );
 }

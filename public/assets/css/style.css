@@ -12602,8 +12602,13 @@ code {
 }
 
 .content {
-  @apply lg:ms-[16rem] mt-[4.25rem] transition-all ms-0;
+  @apply lg:ms-[16rem] mt-[1rem] transition-all ms-0;
 }
+
+/* .content {
+  @apply lg:ms-[16rem] mt-[4rem] transition-all ms-0;
+} */
+
 
 pre {
   @apply border-gray-200 border dark:border-white/10 bg-slate-200 text-[0.75rem] p-5;

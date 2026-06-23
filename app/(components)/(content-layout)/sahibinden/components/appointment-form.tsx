@@ -14,6 +14,7 @@ export default function AppointmentForm({
   isLoggedIn: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"FACE_TO_FACE" | "VIDEO">("FACE_TO_FACE");
   const [when, setWhen] = useState("");
   const [note, setNote] = useState("");
   const [phone, setPhone] = useState("");
@@ -32,7 +33,7 @@ export default function AppointmentForm({
     }
     setError("");
     start(async () => {
-      const res = await requestViewing({ listingId, scheduledAt: when, note, phone });
+      const res = await requestViewing({ listingId, scheduledAt: when, note, phone, mode });
       if (res.ok) setDone(true);
       else setError(res.error ?? "Hata.");
     });
@@ -44,11 +45,44 @@ export default function AppointmentForm({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
       >
-        📅 Gezme Randevusu Al
+        📅 Randevu Al
       </button>
 
       {open && !done && (
         <form onSubmit={submit} className="mt-3 space-y-2">
+          {/* Randevu türü */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setMode("FACE_TO_FACE")}
+              className={`flex flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2 text-xs font-semibold transition ${
+                mode === "FACE_TO_FACE"
+                  ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                  : "border-gray-200 text-gray-600 hover:border-gray-300"
+              }`}
+            >
+              <span className="text-lg">🤝</span>
+              Yüz Yüze
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("VIDEO")}
+              className={`flex flex-col items-center gap-0.5 rounded-lg border-2 px-2 py-2 text-xs font-semibold transition ${
+                mode === "VIDEO"
+                  ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                  : "border-gray-200 text-gray-600 hover:border-gray-300"
+              }`}
+            >
+              <span className="text-lg">📹</span>
+              Görüntülü
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-400">
+            {mode === "VIDEO"
+              ? "Belirlenen saatte karşılıklı kameradan görüşürsünüz."
+              : "İlan sahibi onayladıktan sonra yüz yüze gezersiniz."}
+          </p>
+
           <input
             type="datetime-local"
             value={when}

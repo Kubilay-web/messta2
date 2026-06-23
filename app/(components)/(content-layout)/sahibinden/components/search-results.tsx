@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { validateRequest } from "@/app/auth";
-import { getCategoryTree, getListings, getUserFavoriteIds, type CategoryNode } from "../data";
+import { getCategoryTree, getListings, getUserFavoriteIds, getNeighborhoods, type CategoryNode } from "../data";
 import { parseFilters } from "../lib/parse-filters";
 import ListingCard from "./listing-card";
 import Filters from "./filters";
@@ -40,9 +40,10 @@ export default async function SearchResults({
   const filters = parseFilters(searchParams, categorySlug, topSlug);
 
   const { user } = await validateRequest();
-  const [{ items, total, page, pages }, favIds] = await Promise.all([
+  const [{ items, total, page, pages }, favIds, neighborhoods] = await Promise.all([
     getListings(filters),
     user ? getUserFavoriteIds(user.id) : Promise.resolve(new Set<string>()),
+    filters.city ? getNeighborhoods(filters.city, filters.district) : Promise.resolve([] as string[]),
   ]);
 
   const view = (Array.isArray(searchParams.view) ? searchParams.view[0] : searchParams.view) ?? "grid";
@@ -63,12 +64,20 @@ export default async function SearchResults({
       </div>
 
       <div className="mb-3 lg:hidden">
-        <MobileFilters topSlug={topSlug} subCategories={subCategories.map((c) => ({ name: c.name, slug: c.slug }))} />
+        <MobileFilters
+          topSlug={topSlug}
+          subCategories={subCategories.map((c) => ({ name: c.name, slug: c.slug }))}
+          neighborhoods={neighborhoods}
+        />
       </div>
 
       <div className="flex gap-5">
         <div className="hidden w-64 shrink-0 lg:block">
-          <Filters topSlug={topSlug} subCategories={subCategories.map((c) => ({ name: c.name, slug: c.slug }))} />
+          <Filters
+            topSlug={topSlug}
+            subCategories={subCategories.map((c) => ({ name: c.name, slug: c.slug }))}
+            neighborhoods={neighborhoods}
+          />
         </div>
 
         <div className="min-w-0 flex-1">

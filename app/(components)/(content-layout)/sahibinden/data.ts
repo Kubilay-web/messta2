@@ -142,12 +142,31 @@ function buildWhere(
   if (filters.type) where.type = filters.type as Prisma.ShListingWhereInput["type"];
   if (filters.city) where.city = filters.city;
   if (filters.district) where.district = filters.district;
+  if (filters.neighborhood) where.neighborhood = filters.neighborhood;
   if (filters.currency) where.currency = filters.currency as Prisma.ShListingWhereInput["currency"];
   if (filters.minPrice != null || filters.maxPrice != null) {
     where.price = {};
     if (filters.minPrice != null) (where.price as Prisma.FloatFilter).gte = filters.minPrice;
     if (filters.maxPrice != null) (where.price as Prisma.FloatFilter).lte = filters.maxPrice;
   }
+
+  // Native (indeksli) aralık kolonları: m² ve bina yaşı
+  for (const [key, r] of Object.entries(filters.attrRanges ?? {})) {
+    const col = NATIVE_RANGE_COLUMNS[key];
+    if (!col) continue;
+    const cond: { gte?: number; lte?: number } = {};
+    if (r.min != null && !Number.isNaN(r.min)) cond.gte = r.min;
+    if (r.max != null && !Number.isNaN(r.max)) cond.lte = r.max;
+    if (Object.keys(cond).length) where[col] = cond;
+  }
+
+  // Harita alanı (bounding box)
+  if (filters.bbox) {
+    const b = filters.bbox;
+    where.latitude = { gte: b.south, lte: b.north };
+    where.longitude = { gte: b.west, lte: b.east };
+  }
+
   if (filters.q) {
     where.OR = [
       { title: { contains: filters.q, mode: "insensitive" } },
@@ -155,6 +174,103 @@ function buildWhere(
     ];
   }
   return where;
+}
+
+// Denormalize edilmiş indeksli kolona sahip attribute anahtarları.
+// Bu alanların aralık filtresi/sıralaması native Prisma kolonuyla yapılır (hızlı).
+const NATIVE_RANGE_COLUMNS: Record<string, "areaGross" | "buildingAge"> = {
+  grossArea: "areaGross",
+  buildingAge: "buildingAge",
+};
+
+/** Yalnızca JSON içinde tutulan (native kolonu olmayan) bir attribute filtresi var mı? */
+function hasJsonAttrFilters(filters: ListingFilters): boolean {
+  if (Object.keys(filters.attrs ?? {}).length > 0) return true;
+  if (Object.keys(filters.attrIn ?? {}).length > 0) return true;
+  for (const key of Object.keys(filters.attrRanges ?? {})) {
+    if (!NATIVE_RANGE_COLUMNS[key]) return true; // km, year gibi JSON aralıkları
+  }
+  return false;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Tüm filtreleri native MongoDB sorgusuna çevirir (findRaw ile kullanılır).
+ * Prisma MongoDB konnektörü `attributes` JSON alanında `path` filtresini
+ * desteklemediği için, JSON attribute (ısıtma/oda/km vb.) filtreleri ancak
+ * `attributes.<key>` dot-notation native sorgu ile yapılabilir.
+ */
+function buildMongoFilter(
+  filters: ListingFilters,
+  categoryIds?: string[],
+): Record<string, unknown> {
+  const f: Record<string, unknown> = {};
+  if (filters.onlyActive !== false) f.status = "ACTIVE";
+  if (filters.userId) f.userId = filters.userId;
+  if (categoryIds && categoryIds.length) f.categoryId = { $in: categoryIds };
+  if (filters.type) f.type = filters.type;
+  if (filters.city) f.city = filters.city;
+  if (filters.district) f.district = filters.district;
+  if (filters.neighborhood) f.neighborhood = filters.neighborhood;
+  if (filters.currency) f.currency = filters.currency;
+  if (filters.minPrice != null || filters.maxPrice != null) {
+    const p: Record<string, number> = {};
+    if (filters.minPrice != null) p.$gte = filters.minPrice;
+    if (filters.maxPrice != null) p.$lte = filters.maxPrice;
+    f.price = p;
+  }
+  if (filters.bbox) {
+    const b = filters.bbox;
+    f.latitude = { $gte: b.south, $lte: b.north };
+    f.longitude = { $gte: b.west, $lte: b.east };
+  }
+  if (filters.q) {
+    const rx = { $regex: escapeRegex(filters.q), $options: "i" };
+    f.$or = [{ title: rx }, { description: rx }];
+  }
+
+  // Tam eşleşme (select / boolean / text)
+  for (const [key, value] of Object.entries(filters.attrs ?? {})) {
+    if (value === "" || value == null) continue;
+    let parsed: unknown = value;
+    if (value === "true") parsed = true;
+    else if (value === "false") parsed = false;
+    f[`attributes.${key}`] = parsed;
+  }
+
+  // Çoklu-seçim (örn. rooms: ["2+1","3+1"]) → $in
+  for (const [key, vals] of Object.entries(filters.attrIn ?? {})) {
+    if (vals.length) f[`attributes.${key}`] = { $in: vals };
+  }
+
+  // Sayısal aralık — native kolon varsa o kolona, yoksa JSON alanına
+  for (const [key, r] of Object.entries(filters.attrRanges ?? {})) {
+    const cond: Record<string, number> = {};
+    if (r.min != null && !Number.isNaN(r.min)) cond.$gte = r.min;
+    if (r.max != null && !Number.isNaN(r.max)) cond.$lte = r.max;
+    if (!Object.keys(cond).length) continue;
+    const col = NATIVE_RANGE_COLUMNS[key];
+    if (col) f[col] = cond;
+    else f[`attributes.${key}`] = cond;
+  }
+
+  return f;
+}
+
+/** Attribute filtreleri için eşleşen ilan id'lerini native sorgu ile getirir. */
+async function matchingAttrListingIds(
+  filters: ListingFilters,
+  categoryIds?: string[],
+): Promise<string[]> {
+  const mongoFilter = buildMongoFilter(filters, categoryIds);
+  const docs = (await prisma.shListing.findRaw({
+    filter: mongoFilter as Prisma.InputJsonObject,
+    options: { projection: { _id: 1 } } as Prisma.InputJsonObject,
+  })) as unknown as Array<{ _id: string }>;
+  return Array.isArray(docs) ? docs.map((d) => d._id) : [];
 }
 
 function buildOrderBy(
@@ -165,6 +281,10 @@ function buildOrderBy(
       return [{ price: "asc" }];
     case "price_desc":
       return [{ price: "desc" }];
+    case "area_asc":
+      return [{ areaGross: "asc" }];
+    case "area_desc":
+      return [{ areaGross: "desc" }];
     case "oldest":
       return [{ createdAt: "asc" }];
     default:
@@ -184,12 +304,12 @@ export async function getListings(filters: ListingFilters) {
 
   const where = buildWhere(filters, categoryIds);
 
-  // attribute filtreleri (Json path eşitliği)
-  const attrEntries = Object.entries(filters.attrs ?? {}).filter(([, v]) => v);
-  if (attrEntries.length) {
-    where.AND = attrEntries.map(([key, value]) => ({
-      attributes: { path: [key], equals: value },
-    })) as Prisma.ShListingWhereInput[];
+  // JSON içinde tutulan attribute filtreleri (ısıtma, oda, km vb.) MongoDB'de
+  // path desteklenmediğinden native sorgu ile eşleşen id'ler bulunur.
+  // m²/bina yaşı/bbox gibi native kolon filtreleri buildWhere içinde halledilir.
+  if (hasJsonAttrFilters(filters)) {
+    const ids = await matchingAttrListingIds(filters, categoryIds);
+    where.id = { in: ids };
   }
 
   const [items, total] = await Promise.all([
@@ -212,6 +332,7 @@ export async function getListingById(id: string) {
     include: {
       category: true,
       store: { select: { id: true, name: true, slug: true, logo: true, type: true, isVerified: true } },
+      agent: { select: { id: true, name: true, title: true, phone: true, photo: true } },
       user: {
         select: {
           id: true,
@@ -288,11 +409,16 @@ export async function getUserConversations(userId: string) {
     },
   });
 
-  // İlan + karşı taraf bazında grupla
+  // Konuşma kimliğine göre grupla. Her mesaj `deliverMessage` içinde
+  // `ensureConversation` (upsert + @@unique([listingId,buyerId,sellerId])) ile
+  // TEK kanonik conversation'a bağlandığından, `conversationId` üzerinden gruplamak
+  // aynı ilan+kişi için iki ayrı sohbet oluşmasını garantili biçimde engeller.
+  // (Eski/null conversationId kayıtları için `listingId:otherId` fallback'i kullanılır.)
   const map = new Map<string, { key: string; listing: any; other: any; last: any; unread: number; messages: any[] }>();
   for (const m of messages) {
     const otherUser = m.senderId === userId ? m.receiver : m.sender;
-    const key = `${m.listingId}:${otherUser.id}`;
+    if (!otherUser) continue; // karşı taraf silinmişse atla
+    const key = m.conversationId ?? `${m.listingId}:${otherUser.id}`;
     if (!map.has(key)) {
       map.set(key, { key, listing: m.listing, other: otherUser, last: m, unread: 0, messages: [] });
     }
@@ -336,6 +462,14 @@ export async function getDopingPackages() {
     pkgs = await prisma.shDopingPackage.findMany({ where: { active: true }, orderBy: { order: "asc" } });
   }
   return pkgs;
+}
+
+/** Bir ilana uygulanabilen tekrarlayan planlar (otomatik doping + yayın ücreti). */
+export async function getListingSubscriptionPlans() {
+  return prisma.shPlan.findMany({
+    where: { active: true, kind: { in: ["DOPING_AUTO", "LISTING_HOSTING"] } },
+    orderBy: [{ kind: "asc" }, { order: "asc" }],
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -470,6 +604,29 @@ export async function getDistricts(cityId: string) {
   return prisma.shLocation.findMany({ where: { parentId: cityId, type: "DISTRICT" }, orderBy: { name: "asc" } });
 }
 
+/**
+ * Aktif ilanlarda geçen benzersiz mahalle adlarını döndürür (data-driven).
+ * Mahalleler serbest metin olduğundan statik liste yerine gerçek veriden beslenir.
+ */
+export async function getNeighborhoods(city?: string | null, district?: string | null): Promise<string[]> {
+  if (!city) return [];
+  const rows = await prisma.shListing.findMany({
+    where: {
+      status: "ACTIVE",
+      city,
+      ...(district ? { district } : {}),
+      neighborhood: { not: null },
+    },
+    select: { neighborhood: true },
+    distinct: ["neighborhood"],
+    take: 300,
+  });
+  return rows
+    .map((r) => r.neighborhood)
+    .filter((n): n is string => !!n && n.trim() !== "")
+    .sort((a, b) => a.localeCompare(b, "tr"));
+}
+
 // ---------------------------------------------------------------------------
 //  Emlak: randevu / fiyat analizi / karşılaştırma / kapora
 // ---------------------------------------------------------------------------
@@ -480,7 +637,7 @@ export async function getOwnerAppointments(userId: string) {
     orderBy: { scheduledAt: "asc" },
     include: {
       listing: { select: { id: true, title: true, images: true } },
-      requester: { select: { displayName: true, username: true } },
+      requester: { select: { id: true, displayName: true, username: true, avatarUrl: true } },
     },
   });
 }
@@ -491,7 +648,7 @@ export async function getRequesterAppointments(userId: string) {
     orderBy: { scheduledAt: "asc" },
     include: {
       listing: { select: { id: true, title: true, images: true } },
-      owner: { select: { displayName: true, username: true } },
+      owner: { select: { id: true, displayName: true, username: true, avatarUrl: true } },
     },
   });
 }
@@ -517,6 +674,81 @@ export async function getRegionPriceStats(categoryId: string, city: string | nul
   const avgPerM2 = perM2.length ? perM2.reduce((a, b) => a + b, 0) / perM2.length : null;
 
   return { count: prices.length, avgPrice, avgPerM2 };
+}
+
+// İlan istatistikleri (son N gün)
+export async function getListingStats(listingId: string, days = 14) {
+  const rows = await prisma.shListingStat.findMany({
+    where: { listingId },
+    orderBy: { date: "asc" },
+  });
+  const map = new Map(rows.map((r) => [r.date, r]));
+  const out: { date: string; views: number; favorites: number }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const r = map.get(d);
+    out.push({ date: d, views: r?.views ?? 0, favorites: r?.favorites ?? 0 });
+  }
+  return out;
+}
+
+// Zaman serili bölge raporu (son 6 ay ortalama fiyat + adet)
+export async function getRegionReport(categoryId: string, city: string | null) {
+  if (!city) return null;
+  const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * 180);
+  const listings = await prisma.shListing.findMany({
+    where: { categoryId, city, createdAt: { gte: since } },
+    select: { price: true, createdAt: true },
+    take: 1000,
+  });
+  if (listings.length < 3) return null;
+
+  const buckets = new Map<string, { sum: number; count: number }>();
+  for (const l of listings) {
+    const key = l.createdAt.toISOString().slice(0, 7); // yyyy-mm
+    const b = buckets.get(key) ?? { sum: 0, count: 0 };
+    b.sum += l.price;
+    b.count++;
+    buckets.set(key, b);
+  }
+  const months: { month: string; avg: number; count: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const key = d.toISOString().slice(0, 7);
+    const b = buckets.get(key);
+    months.push({ month: key, avg: b ? b.sum / b.count : 0, count: b?.count ?? 0 });
+  }
+  return months;
+}
+
+export async function isUserBlocked(blockerId: string, blockedId: string) {
+  const b = await prisma.shUserBlock.findUnique({
+    where: { blockerId_blockedId: { blockerId, blockedId } },
+  });
+  return !!b;
+}
+
+// Engellenen kullanıcılar
+export async function getBlockedUsers(userId: string) {
+  const blocks = await prisma.shUserBlock.findMany({
+    where: { blockerId: userId },
+    orderBy: { createdAt: "desc" },
+    include: { blocked: { select: { id: true, displayName: true, username: true, avatarUrl: true } } },
+  });
+  return blocks.map((b) => ({ blockId: b.id, ...b.blocked }));
+}
+
+// Danışmanlar
+export async function getStoreAgents(storeId: string) {
+  return prisma.shAgent.findMany({ where: { storeId }, orderBy: { createdAt: "asc" } });
+}
+
+export async function getUserStoreAgents(userId: string) {
+  const store = await prisma.shStore.findFirst({ where: { ownerId: userId } });
+  if (!store) return { store: null, agents: [] };
+  const agents = await prisma.shAgent.findMany({ where: { storeId: store.id }, orderBy: { createdAt: "asc" } });
+  return { store, agents };
 }
 
 export async function getCompareListings(ids: string[]) {

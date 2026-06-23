@@ -6,6 +6,7 @@ import Filters from "./filters";
 export default function MobileFilters(props: {
   topSlug?: string;
   subCategories?: { name: string; slug: string }[];
+  neighborhoods?: string[];
 }) {
   const [open, setOpen] = useState(false);
   return (

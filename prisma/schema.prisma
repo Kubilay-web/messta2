@@ -266,24 +266,34 @@ model User {
   //
 
   // Sahibinden
-  shListings       ShListing[]     @relation("ShUserListings")
-  shFavorites      ShFavorite[]    @relation("ShUserFavorites")
-  shSentMessages   ShMessage[]     @relation("ShSentMessages")
-  shReceivedMsgs   ShMessage[]     @relation("ShReceivedMessages")
-  shReports        ShReport[]      @relation("ShUserReports")
-  shSavedSearches  ShSavedSearch[] @relation("ShUserSavedSearches")
-  shStores         ShStore[]       @relation("ShStoreOwner")
-  shNotifications  ShNotification[] @relation("ShUserNotifications")
-  shReviewsWritten ShReview[]      @relation("ShReviewAuthor")
-  shReviewsGot     ShReview[]      @relation("ShReviewTarget")
-  shConvsAsBuyer   ShConversation[] @relation("ShConvBuyer")
-  shConvsAsSeller  ShConversation[] @relation("ShConvSeller")
-  shRecentViews    ShRecentView[]  @relation("ShUserRecentViews")
-  shPayments       ShPayment[]     @relation("ShUserPayments")
-  shDopings        ShListingDoping[] @relation("ShUserDopings")
-  shApptRequested  ShViewingAppointment[] @relation("ShApptRequester")
-  shApptOwned      ShViewingAppointment[] @relation("ShApptOwner")
-  shDepositsBuyer  ShDeposit[]     @relation("ShDepositBuyer")
+  shListings         ShListing[]            @relation("ShUserListings")
+  shFavorites        ShFavorite[]           @relation("ShUserFavorites")
+  shSentMessages     ShMessage[]            @relation("ShSentMessages")
+  shReceivedMsgs     ShMessage[]            @relation("ShReceivedMessages")
+  shReports          ShReport[]             @relation("ShUserReports")
+  shSavedSearches    ShSavedSearch[]        @relation("ShUserSavedSearches")
+  shStores           ShStore[]              @relation("ShStoreOwner")
+  shNotifications    ShNotification[]       @relation("ShUserNotifications")
+  shReviewsWritten   ShReview[]             @relation("ShReviewAuthor")
+  shReviewsGot       ShReview[]             @relation("ShReviewTarget")
+  shConvsAsBuyer     ShConversation[]       @relation("ShConvBuyer")
+  shConvsAsSeller    ShConversation[]       @relation("ShConvSeller")
+  shRecentViews      ShRecentView[]         @relation("ShUserRecentViews")
+  shPayments         ShPayment[]            @relation("ShUserPayments")
+  shDopings          ShListingDoping[]      @relation("ShUserDopings")
+  shApptRequested    ShViewingAppointment[] @relation("ShApptRequester")
+  shApptOwned        ShViewingAppointment[] @relation("ShApptOwner")
+  shDepositsBuyer    ShDeposit[]            @relation("ShDepositBuyer")
+  shBlocksMade       ShUserBlock[]          @relation("ShBlocker")
+  shBlocksGot        ShUserBlock[]          @relation("ShBlocked")
+  shLastSeenAt       DateTime? // sahibinden mesajlaşmada çevrimiçi/son görülme
+  // Ödeme / abonelik / cüzdan
+  shStripeCustomerId String? // Stripe müşteri kimliği (saklı kart / abonelik)
+  shWallet           ShWallet?              @relation("ShUserWallet")
+  shWalletTxns       ShWalletTxn[]          @relation("ShUserWalletTxns")
+  shSubscriptions    ShSubscription[]       @relation("ShUserSubscriptions")
+  shBookingsMade     ShRentalBooking[]      @relation("ShBookingRenter")
+  shBookingsOwned    ShRentalBooking[]      @relation("ShBookingOwner")
   //
 
   @@map("users")
@@ -4062,9 +4072,6 @@ enum StudentAttendanceStatus {
 
 //School Management Finish
 
-
-
-
 //Real Estate ERP
 
 enum UserRoleGayrimenkul {
@@ -4245,8 +4252,6 @@ model Agency {
   crmLeads      Lead[]
   crmTasks      CrmTask[]
   crmActivities CrmActivity[]
-
-
 
   // Gelişmiş ERP (teklif, muhasebe, kira, iletişim)
   offers              PropertyOffer[]
@@ -5547,9 +5552,6 @@ model AgencyAuditLog {
 
 //Real Estate ERP
 
-
-
-
 // ============================================================
 // ===============  REAL ESTATE CRM (ERP üstü)  ===============
 // ============================================================
@@ -5796,12 +5798,6 @@ model CrmTask {
   @@map("crm-tasks")
 }
 
-
-
-
-
-
-
 //Sahibinden
 // =====================================================================
 //  SAHIBINDEN — Classifieds Marketplace (yeni şema, login/register'a bağlı)
@@ -5879,6 +5875,10 @@ model ShListing {
   storeId String?
   store   ShStore? @relation(fields: [storeId], references: [id], onDelete: SetNull)
 
+  // İlanı yöneten danışman (opsiyonel)
+  agentId String?
+  agent   ShAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
   // İlişkisel lokasyon (opsiyonel — geriye uyum için string alanlar korunur)
   locationId String?
   location   ShLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
@@ -5900,6 +5900,10 @@ model ShListing {
   /// Kategoriye özel özellikler (m², oda sayısı, km, model yılı, vb.)
   attributes Json?
 
+  // Denormalize edilmiş, indeksli filtre/sıralama alanları (attributes'tan türetilir)
+  areaGross   Float? // m² brüt — hızlı aralık filtresi + sıralama
+  buildingAge Int? // bina yaşı — hızlı aralık filtresi
+
   // Durum / ticaret seçenekleri
   condition     String? // Sıfır / İkinci El
   isNegotiable  Boolean @default(false) // Pazarlık payı var
@@ -5907,14 +5911,33 @@ model ShListing {
   securePayment Boolean @default(false) // Güvenli ödeme / kapora
 
   // Doping bayrakları + bitiş tarihleri
-  isUrgent       Boolean   @default(false) // Acil
-  isFeatured     Boolean   @default(false) // Öne çıkan
-  isShowcase     Boolean   @default(false) // Vitrin
-  urgentUntil    DateTime?
-  featuredUntil  DateTime?
-  showcaseUntil  DateTime?
-  bumpedAt       DateTime? // İlanı güncelle/öne al
-  isActive       Boolean   @default(true)
+  isUrgent      Boolean   @default(false) // Acil
+  isFeatured    Boolean   @default(false) // Öne çıkan
+  isShowcase    Boolean   @default(false) // Vitrin
+  urgentUntil   DateTime?
+  featuredUntil DateTime?
+  showcaseUntil DateTime?
+  bumpedAt      DateTime? // İlanı güncelle/öne al
+  isActive      Boolean   @default(true)
+
+  // İlan yayın (hosting) aboneliği — günlük/haftalık ücretli yayın
+  hostingPaidUntil DateTime?
+  // Otomatik yenilenen doping aboneliği aktif mi (ilan hep vitrinde/öne çıkanda)
+  autoDopingOn     Boolean   @default(false)
+
+  // --- Kısa dönem kiralama (günlük/haftalık rezervasyon) ---
+  rentable     Boolean @default(false) // Rezervasyona açık mı
+  dailyPrice   Float? // Günlük fiyat
+  weeklyPrice  Float? // Haftalık fiyat (günlüğe göre indirimli olabilir)
+  monthlyPrice Float? // Aylık fiyat
+  cleaningFee  Float? // Temizlik ücreti (tek seferlik)
+  rentDeposit  Float? // Güvenlik depozitosu (iade edilebilir)
+  minNights    Int? // En az kaç gece
+  maxNights    Int? // En çok kaç gece
+  maxGuests    Int? // Maksimum misafir
+  checkInTime  String? // "14:00"
+  checkOutTime String? // "11:00"
+  instantBook  Boolean @default(false) // Onaysız anında rezervasyon
 
   viewCount     Int @default(0)
   favoriteCount Int @default(0)
@@ -5928,16 +5951,20 @@ model ShListing {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  favorites     ShFavorite[]
-  messages      ShMessage[]
-  reports       ShReport[]
-  priceHistory  ShPriceHistory[]
-  dopings       ShListingDoping[]
-  conversations ShConversation[]
-  recentViews   ShRecentView[]
-  reviews       ShReview[]
-  appointments  ShViewingAppointment[]
-  deposits      ShDeposit[]
+  favorites      ShFavorite[]
+  messages       ShMessage[]
+  reports        ShReport[]
+  priceHistory   ShPriceHistory[]
+  dopings        ShListingDoping[]
+  conversations  ShConversation[]
+  recentViews    ShRecentView[]
+  reviews        ShReview[]
+  appointments   ShViewingAppointment[]
+  deposits       ShDeposit[]
+  stats          ShListingStat[]
+  subscriptions  ShSubscription[]       @relation("ShListingSubscriptions")
+  rentalBookings ShRentalBooking[]
+  rentalBlocks   ShRentalBlock[]
 
   @@index([categoryId])
   @@index([userId])
@@ -5949,6 +5976,10 @@ model ShListing {
   @@index([createdAt])
   @@index([isShowcase])
   @@index([isFeatured])
+  @@index([areaGross])
+  @@index([buildingAge])
+  @@index([latitude])
+  @@index([longitude])
   @@map("sh_listings")
 }
 
@@ -5967,6 +5998,12 @@ model ShFavorite {
   @@map("sh_favorites")
 }
 
+enum ShMessageKind {
+  TEXT
+  IMAGE
+  CALL // görüntülü/sesli arama kaydı
+}
+
 /// İlan üzerinden mesajlaşma
 model ShMessage {
   id        String    @id @default(cuid()) @map("_id")
@@ -5983,6 +6020,25 @@ model ShMessage {
 
   content String
   isRead  Boolean @default(false)
+
+  kind     ShMessageKind @default(TEXT)
+  imageUrl String? // IMAGE türü için Cloudinary görsel adresi
+
+  // CALL türü için: arama sonucu ve süresi
+  callOutcome  String? // "answered" | "missed" | "rejected" | "cancelled"
+  callDuration Int? // saniye cinsinden konuşma süresi
+  callVideo    Boolean @default(true) // görüntülü mü, sesli mi
+
+  editedAt  DateTime?
+  deletedAt DateTime?
+
+  // Yanıtla / alıntıla (bir mesaja yanıt)
+  replyToId String?
+  replyTo   ShMessage?  @relation("ShMsgReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   ShMessage[] @relation("ShMsgReply")
+
+  // Reaksiyonlar: [{ userId, emoji }]
+  reactions Json?
 
   createdAt DateTime @default(now())
 
@@ -6035,6 +6091,9 @@ model ShSavedSearch {
 //  SAHIBINDEN — Kurumsal / Gelişmiş modüller
 // =====================================================================
 
+
+
+
 enum ShStoreType {
   INDIVIDUAL // Bireysel
   CORPORATE // Kurumsal mağaza
@@ -6045,30 +6104,37 @@ enum ShStoreType {
 
 /// Kurumsal mağaza / galeri / emlak ofisi
 model ShStore {
-  id          String      @id @default(cuid()) @map("_id")
-  ownerId     String
-  owner       User        @relation("ShStoreOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  name        String
-  slug        String      @unique
-  type        ShStoreType @default(CORPORATE)
-  logo        String?
-  banner      String?
-  about       String?
-  phone       String?
-  email       String?
-  website     String?
-  address     String?
-  city        String?
-  taxOffice   String?
-  taxNumber   String?
-  memberSince DateTime    @default(now())
-  isVerified  Boolean     @default(false)
-  rating      Float       @default(0)
-  reviewCount Int         @default(0)
-  followerCount Int       @default(0)
+  id            String      @id @default(cuid()) @map("_id")
+  ownerId       String
+  owner         User        @relation("ShStoreOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  name          String
+  slug          String      @unique
+  type          ShStoreType @default(CORPORATE)
+  logo          String?
+  banner        String?
+  about         String?
+  phone         String?
+  email         String?
+  website       String?
+  address       String?
+  city          String?
+  taxOffice     String?
+  taxNumber     String?
+  memberSince   DateTime    @default(now())
+  isVerified    Boolean     @default(false)
+  rating        Float       @default(0)
+  reviewCount   Int         @default(0)
+  followerCount Int         @default(0)
 
-  listings ShListing[]
-  reviews  ShReview[]
+  // Pro mağaza aboneliği (tekrarlayan)
+  isPro     Boolean   @default(false)
+  proUntil  DateTime?
+  proPlanId String?
+
+  listings      ShListing[]
+  reviews       ShReview[]
+  agents        ShAgent[]
+  subscriptions ShSubscription[] @relation("ShStoreSubscriptions")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6139,14 +6205,14 @@ enum ShDopingType {
 
 /// Doping paketleri (ücretli öne çıkarma)
 model ShDopingPackage {
-  id          String       @id @default(cuid()) @map("_id")
-  name        String
-  type        ShDopingType
-  durationDays Int         @default(7)
-  price       Float
-  currency    ShCurrency   @default(TRY)
-  active      Boolean      @default(true)
-  order       Int          @default(0)
+  id           String       @id @default(cuid()) @map("_id")
+  name         String
+  type         ShDopingType
+  durationDays Int          @default(7)
+  price        Float
+  currency     ShCurrency   @default(TRY)
+  active       Boolean      @default(true)
+  order        Int          @default(0)
 
   dopings ShListingDoping[]
 
@@ -6190,6 +6256,8 @@ enum ShPaymentType {
   DOPING
   STORE_SUBSCRIPTION
   DEPOSIT
+  WALLET_TOPUP // cüzdana para yükleme
+  SUBSCRIPTION // tekrarlayan abonelik tahsilatı (ilk + yenileme)
 }
 
 enum ShPaymentStatus {
@@ -6208,18 +6276,26 @@ model ShPayment {
   currency ShCurrency      @default(TRY)
   type     ShPaymentType   @default(DOPING)
   status   ShPaymentStatus @default(PAID)
-  provider String? // iyzico / stripe / paypal vb.
-  refId    String? // sağlayıcı işlem no
+  provider String? // iyzico / stripe / paypal / wallet
+  refId    String? // sağlayıcı işlem no (idempotency anahtarı)
   meta     Json?
 
-  dopings  ShListingDoping[]
-  deposits ShDeposit[]
+  // Tekrarlayan abonelik tahsilatıysa hangi aboneliğe ait
+  subscriptionId String?
+  subscription   ShSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  dopings        ShListingDoping[]
+  deposits       ShDeposit[]
+  walletTxns     ShWalletTxn[]
+  rentalBookings ShRentalBooking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([status])
+  @@index([refId])
+  @@index([subscriptionId])
   @@map("sh_payments")
 }
 
@@ -6233,11 +6309,15 @@ model ShConversation {
   sellerId  String
   seller    User      @relation("ShConvSeller", fields: [sellerId], references: [id], onDelete: Cascade)
 
-  lastMessageAt DateTime @default(now())
-  buyerArchived  Boolean @default(false)
-  sellerArchived Boolean @default(false)
-  buyerUnread    Int     @default(0)
-  sellerUnread   Int     @default(0)
+  lastMessageAt  DateTime @default(now())
+  buyerArchived  Boolean  @default(false)
+  sellerArchived Boolean  @default(false)
+  buyerUnread    Int      @default(0)
+  sellerUnread   Int      @default(0)
+
+  // "yazıyor..." göstergesi için son tuş zamanları
+  buyerTypingAt  DateTime?
+  sellerTypingAt DateTime?
 
   messages ShMessage[]
 
@@ -6247,6 +6327,28 @@ model ShConversation {
   @@index([buyerId])
   @@index([sellerId])
   @@map("sh_conversations")
+}
+
+/// WebRTC görüntülü arama sinyalleşmesi (offer/answer/ice + arama yaşam döngüsü).
+/// Sunucu tarafında kalıcı bir WebSocket olmadığı için DB üzerinden polling ile taşınır.
+model ShCallSignal {
+  id        String  @id @default(cuid()) @map("_id")
+  callId    String // bir arama oturumunu gruplar
+  listingId String
+  fromId    String
+  toId      String
+  // "ring" | "offer" | "answer" | "ice" | "accept" | "reject" | "end" | "busy" | "cancel"
+  type      String
+  payload   String? // JSON: SDP veya ICE candidate
+  video     Boolean @default(true)
+  consumed  Boolean @default(false) // karşı taraf işledikten sonra true
+
+  createdAt DateTime @default(now())
+
+  @@index([toId, consumed])
+  @@index([callId])
+  @@index([createdAt])
+  @@map("sh_call_signals")
 }
 
 enum ShNotificationType {
@@ -6339,7 +6441,12 @@ enum ShAppointmentStatus {
   COMPLETED // Gerçekleşti
 }
 
-/// Emlak gezme randevusu
+enum ShAppointmentMode {
+  FACE_TO_FACE // Yüz yüze gezme (onaylı)
+  VIDEO // Görüntülü (kameradan) görüşme
+}
+
+/// Emlak gezme / görüntülü görüşme randevusu
 model ShViewingAppointment {
   id          String              @id @default(cuid()) @map("_id")
   listingId   String
@@ -6349,9 +6456,15 @@ model ShViewingAppointment {
   ownerId     String
   owner       User                @relation("ShApptOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   scheduledAt DateTime
+  durationMin Int                 @default(30) // tahmini süre (dk)
+  mode        ShAppointmentMode   @default(FACE_TO_FACE)
   note        String?
   phone       String?
   status      ShAppointmentStatus @default(PENDING)
+
+  // Görüntülü görüşme izleme
+  callStartedAt DateTime?
+  callEndedAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6359,6 +6472,7 @@ model ShViewingAppointment {
   @@index([listingId])
   @@index([requesterId])
   @@index([ownerId])
+  @@index([scheduledAt])
   @@map("sh_viewing_appointments")
 }
 
@@ -6368,6 +6482,55 @@ enum ShDepositStatus {
   RELEASED // Satıcıya aktarıldı
   REFUNDED // İade edildi
   CANCELLED // İptal
+}
+
+/// Günlük ilan istatistiği (görüntülenme/favori trendi)
+model ShListingStat {
+  id        String    @id @default(cuid()) @map("_id")
+  listingId String
+  listing   ShListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  date      String // yyyy-mm-dd
+  views     Int       @default(0)
+  favorites Int       @default(0)
+
+  @@unique([listingId, date])
+  @@index([listingId])
+  @@map("sh_listing_stats")
+}
+
+/// Kullanıcı engelleme (kara liste)
+model ShUserBlock {
+  id        String   @id @default(cuid()) @map("_id")
+  blockerId String
+  blocker   User     @relation("ShBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("ShBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@map("sh_user_blocks")
+}
+
+/// Emlak danışmanı (ofis/mağaza altında)
+model ShAgent {
+  id      String  @id @default(cuid()) @map("_id")
+  storeId String
+  store   ShStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name    String
+  title   String?
+  phone   String?
+  email   String?
+  photo   String?
+  bio     String?
+
+  listings ShListing[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId])
+  @@map("sh_agents")
 }
 
 /// Kapora / ön ödeme (escrow-lite)
@@ -6390,4 +6553,243 @@ model ShDeposit {
   @@index([listingId])
   @@index([buyerId])
   @@map("sh_deposits")
+}
+
+// ===========================================================================
+//  TEKRARLAYAN ÖDEME / ABONELİK / CÜZDAN
+//  Dört konu tek motorda: "interval'i (gün/hafta/ay) olan bir Plan'a abonelik".
+// ===========================================================================
+
+enum ShBillingInterval {
+  DAY
+  WEEK
+  MONTH
+  YEAR
+}
+
+enum ShPlanKind {
+  STORE_PRO // Pro mağaza üyeliği
+  DOPING_AUTO // Otomatik yenilenen doping (ilan hep vitrinde/öne çıkanda)
+  LISTING_HOSTING // İlan yayın ücreti (günlük/haftalık)
+}
+
+/// Abonelik planı kataloğu (admin tanımlı). Stripe/PayPal fiyatlarına eşlenir.
+model ShPlan {
+  id            String            @id @default(cuid()) @map("_id")
+  name          String
+  slug          String            @unique
+  kind          ShPlanKind
+  interval      ShBillingInterval @default(WEEK)
+  intervalCount Int               @default(1) // örn. her 2 haftada bir
+  price         Float
+  currency      ShCurrency        @default(TRY)
+  trialDays     Int               @default(0)
+  features      String[]          @default([]) // pazarlama maddeleri
+  limits        Json? // { maxListings: 50, maxPhotos: 30, ... }
+  dopingType    ShDopingType? // DOPING_AUTO planları için hangi doping
+  badge         String? // "Popüler" / "En Avantajlı"
+  active        Boolean           @default(true)
+  order         Int               @default(0)
+
+  // Sağlayıcıda önceden oluşturulmuş tekrarlayan fiyat/plan kimlikleri
+  stripePriceId String?
+  paypalPlanId  String?
+
+  subscriptions ShSubscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
+  @@map("sh_plans")
+}
+
+enum ShSubStatus {
+  PENDING // checkout başladı, ilk ödeme bekleniyor
+  TRIALING
+  ACTIVE
+  PAST_DUE // ödeme başarısız — grace dönemi
+  CANCELED // dönem sonunda bitecek / bitti
+  EXPIRED
+}
+
+/// Canlı abonelik kaydı (Stripe/PayPal/cüzdan ile yenilenir).
+model ShSubscription {
+  id     String     @id @default(cuid()) @map("_id")
+  userId String
+  user   User       @relation("ShUserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+  planId String
+  plan   ShPlan     @relation(fields: [planId], references: [id])
+  kind   ShPlanKind
+
+  // Hedef (kind'a göre opsiyonel)
+  storeId   String?
+  store     ShStore?   @relation("ShStoreSubscriptions", fields: [storeId], references: [id], onDelete: Cascade)
+  listingId String?
+  listing   ShListing? @relation("ShListingSubscriptions", fields: [listingId], references: [id], onDelete: Cascade)
+
+  status             ShSubStatus @default(PENDING)
+  provider           String // "stripe" | "paypal" | "wallet"
+  providerSubId      String? // stripe sub_… / paypal I-…
+  providerCustomerId String?
+
+  currentPeriodStart DateTime  @default(now())
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean   @default(false)
+  canceledAt         DateTime?
+
+  // Cüzdan ile otomatik yenileme
+  autoRenew      Boolean @default(true)
+  failedAttempts Int     @default(0)
+
+  payments ShPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([providerSubId])
+  @@index([listingId])
+  @@index([storeId])
+  @@map("sh_subscriptions")
+}
+
+enum ShWalletTxnType {
+  TOPUP // para yükleme
+  SPEND // harcama
+  REFUND // iade
+  BONUS // promosyon/hediye
+}
+
+/// Kullanıcı ön ödemeli bakiyesi.
+model ShWallet {
+  id       String     @id @default(cuid()) @map("_id")
+  userId   String     @unique
+  user     User       @relation("ShUserWallet", fields: [userId], references: [id], onDelete: Cascade)
+  balance  Float      @default(0)
+  currency ShCurrency @default(TRY)
+
+  // Bakiye eşiğin altına düşünce otomatik yükleme (saklı kartla)
+  autoTopup          Boolean @default(false)
+  autoTopupThreshold Float   @default(0)
+  autoTopupAmount    Float   @default(0)
+
+  txns ShWalletTxn[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sh_wallets")
+}
+
+/// Cüzdan defteri (her hareket bir satır; bakiye türetilebilir + denetlenebilir).
+model ShWalletTxn {
+  id           String          @id @default(cuid()) @map("_id")
+  walletId     String
+  wallet       ShWallet        @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User            @relation("ShUserWalletTxns", fields: [userId], references: [id], onDelete: Cascade)
+  type         ShWalletTxnType
+  amount       Float // +yükleme / -harcama
+  balanceAfter Float
+  currency     ShCurrency      @default(TRY)
+  description  String?
+  refType      String? // "doping" | "subscription" | "topup" | "deposit"
+  refId        String?
+  paymentId    String?
+  payment      ShPayment?      @relation(fields: [paymentId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([walletId])
+  @@index([userId])
+  @@map("sh_wallet_txns")
+}
+
+// ===========================================================================
+//  KISA DÖNEM KİRALAMA / REZERVASYON (günlük / haftalık)
+// ===========================================================================
+
+enum ShRentalUnit {
+  DAY
+  WEEK
+  MONTH
+}
+
+enum ShBookingStatus {
+  PENDING // Talep edildi, ödeme/onay bekliyor
+  AWAITING_APPROVAL // Ödendi, ev sahibi onayı bekleniyor
+  CONFIRMED // Onaylandı / kesinleşti
+  REJECTED // Ev sahibi reddetti (iade)
+  CANCELLED // İptal edildi
+  COMPLETED // Konaklama tamamlandı
+  EXPIRED // Süresi doldu (ödenmedi)
+}
+
+/// Bir ilana ait kiralama rezervasyonu (tarih aralığı + fiyat dökümü).
+model ShRentalBooking {
+  id        String    @id @default(cuid()) @map("_id")
+  listingId String
+  listing   ShListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  renterId  String
+  renter    User      @relation("ShBookingRenter", fields: [renterId], references: [id], onDelete: Cascade)
+  ownerId   String
+  owner     User      @relation("ShBookingOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Tarih aralığı (UTC gün başlangıcı). endDate = çıkış günü (dahil değil).
+  startDate DateTime
+  endDate   DateTime
+  unit      ShRentalUnit @default(DAY)
+  nights    Int // gece/gün sayısı
+  guests    Int          @default(1)
+
+  // Fiyat dökümü
+  pricePerUnit Float
+  subtotal     Float
+  cleaningFee  Float      @default(0)
+  serviceFee   Float      @default(0)
+  discount     Float      @default(0)
+  deposit      Float      @default(0) // güvenlik depozitosu (iade edilebilir)
+  totalAmount  Float
+  currency     ShCurrency @default(TRY)
+
+  status ShBookingStatus @default(PENDING)
+
+  note         String?
+  contactPhone String?
+  cancelReason String?
+
+  paymentId String?
+  payment   ShPayment? @relation(fields: [paymentId], references: [id])
+  depositId String? // ShDeposit (güvenlik depozitosu emaneti)
+
+  confirmedAt DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([listingId])
+  @@index([renterId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([listingId, startDate, endDate])
+  @@map("sh_rental_bookings")
+}
+
+/// Ev sahibinin manuel kapattığı (müsait olmayan) tarih aralıkları.
+model ShRentalBlock {
+  id        String    @id @default(cuid()) @map("_id")
+  listingId String
+  listing   ShListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([listingId])
+  @@index([listingId, startDate, endDate])
+  @@map("sh_rental_blocks")
 }

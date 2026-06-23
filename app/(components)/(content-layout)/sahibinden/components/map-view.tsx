@@ -21,12 +21,23 @@ export interface MapMarker {
   href?: string;
 }
 
+export interface MapBounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
+
 export default function MapView(props: {
   lat?: number | null;
   lng?: number | null;
   onPick?: (lat: number, lng: number) => void;
   height?: number;
   markers?: MapMarker[];
+  /** "Bu alanda ara" butonu — mevcut harita sınırlarını döndürür. */
+  onSearchArea?: (bounds: MapBounds) => void;
+  /** Aktif alan filtresi — harita üzerinde dikdörtgen olarak çizilir. */
+  drawnBounds?: MapBounds | null;
 }) {
   return <LeafletMap {...props} />;
 }

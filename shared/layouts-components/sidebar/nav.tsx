@@ -243,6 +243,7 @@ export const getMenuItems = (_user?: { agencyId?: string | null }) => [
     children: [
       { path: "/", type: "link", active: false, selected: false, title: "Anasayfa" },
       { path: "/sahibinden", type: "link", active: false, selected: false, title: "Pazaryeri" },
+      { path: "/sahibinden/ara", type: "link", active: false, selected: false, title: "Tüm İlanlar / Arama" },
       { path: "/sahibinden/kategori/emlak", type: "link", active: false, selected: false, title: "Tüm Emlak İlanları" },
       { path: "/sahibinden/kategori/satilik-daire", type: "link", active: false, selected: false, title: "Satılık Daire" },
       { path: "/sahibinden/kategori/kiralik-daire", type: "link", active: false, selected: false, title: "Kiralık Daire" },
@@ -271,6 +272,12 @@ export const getMenuItems = (_user?: { agencyId?: string | null }) => [
       { path: "/sahibinden/hesabim/mesajlarim", type: "link", active: false, selected: false, title: "Mesajlarım" },
       { path: "/sahibinden/hesabim/bildirimler", type: "link", active: false, selected: false, title: "Bildirimler" },
       { path: "/sahibinden/hesabim/magaza", type: "link", active: false, selected: false, title: "Mağazam" },
+      { path: "/sahibinden/hesabim/rezervasyonlarim", type: "link", active: false, selected: false, title: "Rezervasyonlarım" },
+      { path: "/sahibinden/hesabim/danismanlar", type: "link", active: false, selected: false, title: "Danışmanlar" },
+      { path: "/sahibinden/hesabim/engellenenler", type: "link", active: false, selected: false, title: "Engellenenler" },
+      { path: "/sahibinden/hesabim/abonelikler", type: "link", active: false, selected: false, title: "Abonelikler" },
+      { path: "/sahibinden/hesabim/cuzdan", type: "link", active: false, selected: false, title: "Cüzdan" },
+      { path: "/sahibinden/hesabim/toplu-yukle", type: "link", active: false, selected: false, title: "Toplu İlan Yükle" },
     ],
   },
   {

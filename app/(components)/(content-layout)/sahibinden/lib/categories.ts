@@ -165,11 +165,15 @@ export interface AttrField {
   options?: string[];
   unit?: string;
   filterable?: boolean;
+  /** Sayısal aralık (min-max) filtresi (type "number"). */
+  range?: boolean;
+  /** Çoklu-seçim filtresi (birden fazla değer seçilebilir, örn. oda sayısı). */
+  multi?: boolean;
 }
 
 export const CATEGORY_ATTRIBUTES: Record<string, AttrField[]> = {
   emlak: [
-    { key: "grossArea", label: "m² (Brüt)", type: "number", unit: "m²", filterable: true },
+    { key: "grossArea", label: "m² (Brüt)", type: "number", unit: "m²", filterable: true, range: true },
     { key: "netArea", label: "m² (Net)", type: "number", unit: "m²" },
     {
       key: "rooms",
@@ -177,8 +181,9 @@ export const CATEGORY_ATTRIBUTES: Record<string, AttrField[]> = {
       type: "select",
       options: ["1+0", "1+1", "2+1", "3+1", "4+1", "5+1", "6+ ve üzeri"],
       filterable: true,
+      multi: true,
     },
-    { key: "buildingAge", label: "Bina Yaşı", type: "number", filterable: true },
+    { key: "buildingAge", label: "Bina Yaşı", type: "number", filterable: true, range: true },
     { key: "floor", label: "Bulunduğu Kat", type: "text" },
     { key: "totalFloors", label: "Kat Sayısı", type: "number" },
     {
@@ -240,8 +245,8 @@ export const CATEGORY_ATTRIBUTES: Record<string, AttrField[]> = {
   vasita: [
     { key: "brand", label: "Marka", type: "text", filterable: true },
     { key: "model", label: "Model", type: "text", filterable: true },
-    { key: "year", label: "Yıl", type: "number", filterable: true },
-    { key: "km", label: "KM", type: "number", unit: "km", filterable: true },
+    { key: "year", label: "Yıl", type: "number", filterable: true, range: true },
+    { key: "km", label: "KM", type: "number", unit: "km", filterable: true, range: true },
     {
       key: "fuel",
       label: "Yakıt",

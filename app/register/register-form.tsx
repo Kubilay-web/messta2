@@ -72,7 +72,7 @@ export default function RegisterForm({ redirect = "/sahibinden" }: { redirect?: 
               <li>✓ Mağaza vitrini & doping</li>
             </ul>
           </div>
-          <p className="text-xs text-gray-200">© {new Date().getFullYear()} emlak — Eğitim amaçlı demo.</p>
+          <p className="text-xs text-gray-200">© {new Date().getFullYear()} emlak</p>
         </div>
       </div>
 
@@ -128,7 +128,7 @@ export default function RegisterForm({ redirect = "/sahibinden" }: { redirect?: 
                 <button
                   type="button"
                   onClick={() => setShow((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black hover:text-gray-700"
                 >
                   {show ? "Gizle" : "Göster"}
                 </button>
@@ -143,7 +143,7 @@ export default function RegisterForm({ redirect = "/sahibinden" }: { redirect?: 
               {pending ? "Hesap oluşturuluyor..." : "Üye Ol"}
             </button>
 
-            <p className="text-center text-[11px] text-gray-400">
+            <p className="text-center text-[11px] text-black">
               Üye olarak kullanım koşullarını kabul etmiş sayılırsın.
             </p>
           </form>
@@ -154,7 +154,7 @@ export default function RegisterForm({ redirect = "/sahibinden" }: { redirect?: 
               Giriş Yap
             </Link>
           </p>
-          <p className="mt-2 text-center text-xs text-gray-400">
+          <p className="mt-2 text-center text-xs text-black">
             <Link href="/" className="hover:text-gray-700">← Anasayfaya dön</Link>
           </p>
         </div>

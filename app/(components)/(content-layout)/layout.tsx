@@ -23,7 +23,7 @@ const Layout = ({ children, }: any) => {
                 <Switcher />
                 <Loader />
                 <div className='page'>
-                    <Header />
+                    {/* <Header /> */}
                       <Sidebar />  
                     <div className='content main-index'>
                   

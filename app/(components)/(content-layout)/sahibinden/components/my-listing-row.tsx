@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { deleteListing, setListingStatus } from "../actions";
-import { formatPrice, timeAgo } from "../lib/format";
+import { deleteListing, setListingStatus, renewListing } from "../actions";
+import { formatPrice, formatDate, timeAgo } from "../lib/format";
 import { STATUS_LABELS } from "../lib/categories";
 import DopingDialog, { type DopingPackage } from "./doping-dialog";
+import ListingSubscribeDialog, { type ListingPlanVM } from "./listing-subscribe-dialog";
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE: "bg-green-50 text-green-700",
@@ -20,9 +21,15 @@ const STATUS_COLORS: Record<string, string> = {
 export default function MyListingRow({
   listing,
   dopingPackages = [],
+  subscriptionPlans = [],
+  walletBalance = 0,
+  paypalEnabled = false,
 }: {
   listing: any;
   dopingPackages?: DopingPackage[];
+  subscriptionPlans?: ListingPlanVM[];
+  walletBalance?: number;
+  paypalEnabled?: boolean;
 }) {
   const [status, setStatus] = useState(listing.status);
   const [deleted, setDeleted] = useState(false);
@@ -31,10 +38,24 @@ export default function MyListingRow({
 
   if (deleted) return null;
 
+  const [expiresAt, setExpiresAt] = useState<string | null>(listing.expiresAt ?? null);
+  const isExpired = status === "EXPIRED" || (expiresAt && new Date(expiresAt) < new Date());
+  const daysLeft = expiresAt ? Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000) : null;
+
   function changeStatus(next: string) {
     start(async () => {
       const res = await setListingStatus(listing.id, next);
       if (res.ok) setStatus(next);
+    });
+  }
+
+  function renew() {
+    start(async () => {
+      const res = await renewListing(listing.id);
+      if (res.ok) {
+        setStatus("ACTIVE");
+        setExpiresAt(new Date(Date.now() + 30 * 86400000).toISOString());
+      }
     });
   }
 
@@ -64,13 +85,34 @@ export default function MyListingRow({
             <span>{listing.viewCount ?? 0} görüntülenme</span>
             <span>•</span>
             <span>{timeAgo(listing.createdAt)}</span>
+            {expiresAt && !isExpired && daysLeft !== null && daysLeft <= 7 && (
+              <span className="font-semibold text-orange-600">• {daysLeft} gün kaldı</span>
+            )}
+            {isExpired && <span className="font-semibold text-red-500">• Süresi doldu</span>}
           </div>
         </div>
       </Link>
 
       <div className="flex flex-wrap items-center gap-2">
+        {(isExpired || status === "PASSIVE") && (
+          <button
+            onClick={renew}
+            disabled={pending}
+            className="rounded-lg border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100"
+          >
+            🔄 Yenile
+          </button>
+        )}
         {dopingPackages.length > 0 && status === "ACTIVE" && (
           <DopingDialog listingId={listing.id} packages={dopingPackages} />
+        )}
+        {subscriptionPlans.length > 0 && status === "ACTIVE" && (
+          <ListingSubscribeDialog
+            listingId={listing.id}
+            plans={subscriptionPlans}
+            walletBalance={walletBalance}
+            paypalEnabled={paypalEnabled}
+          />
         )}
         <Link
           href={`/sahibinden/ilan/${listing.id}/duzenle`}

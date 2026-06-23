@@ -26,7 +26,7 @@ export default function SearchBar({
   return (
     <form
       onSubmit={submit}
-      className={`flex w-full overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/5 ${
+      className={`flex w-full overflow-hidden rounded-lg border border-gray-400 bg-white ${
         size === "lg" ? "h-12 sm:h-14" : "h-10 sm:h-11"
       }`}
     >
@@ -48,7 +48,7 @@ export default function SearchBar({
         value={q}
         onChange={(e) => setQ(e.target.value)}
         placeholder="Kelime, ilan no veya mağaza adı ile ara"
-        className="min-w-0 flex-1 px-3 text-sm text-gray-800 outline-none sm:px-4"
+        className="min-w-0 flex-1 px-3 text-sm text-gray-800 outline-none placeholder:text-black sm:px-4"
       />
       <button
         type="submit"

@@ -57,7 +57,7 @@ export default function LoginForm({ redirect = "/sahibinden" }: { redirect?: str
               kapora ile anlaş.
             </p>
           </div>
-          <p className="text-xs text-gray-300">© {new Date().getFullYear()} emlak — Eğitim amaçlı demo.</p>
+          <p className="text-xs text-gray-300">© {new Date().getFullYear()} emlak </p>
         </div>
       </div>
 
@@ -83,7 +83,7 @@ export default function LoginForm({ redirect = "/sahibinden" }: { redirect?: str
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="kullaniciadi"
+                placeholder="kullanıcıadı"
                 autoComplete="username"
                 className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-yellow-400"
               />
@@ -108,7 +108,7 @@ export default function LoginForm({ redirect = "/sahibinden" }: { redirect?: str
                 <button
                   type="button"
                   onClick={() => setShow((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-black hover:text-gray-700"
                 >
                   {show ? "Gizle" : "Göster"}
                 </button>
@@ -130,7 +130,7 @@ export default function LoginForm({ redirect = "/sahibinden" }: { redirect?: str
               Üye Ol
             </Link>
           </p>
-          <p className="mt-2 text-center text-xs text-gray-400">
+          <p className="mt-2 text-center text-xs text-black">
             <Link href="/" className="hover:text-gray-700">← Anasayfaya dön</Link>
           </p>
         </div>

@@ -13,6 +13,7 @@ import { DISTRICTS_BY_PROVINCE } from "../lib/tr-locations";
 import type { EmlakFeatures } from "../lib/emlak-features";
 import MapView from "./map-view";
 import EmlakFeaturesPicker from "./emlak-features-picker";
+import SortableImages from "./sortable-images";
 import type { CategoryNode } from "../data";
 import type { ListingFormInput } from "../lib/types";
 
@@ -23,11 +24,13 @@ export default function ListingForm({
   categories,
   defaultContact,
   userStore,
+  storeAgents = [],
   initial,
 }: {
   categories: CategoryNode[];
   defaultContact: { name: string; phone: string };
   userStore?: { id: string; name: string } | null;
+  storeAgents?: { id: string; name: string }[];
   initial?: any;
 }) {
   const router = useRouter();
@@ -74,9 +77,22 @@ export default function ListingForm({
   const [showPhone, setShowPhone] = useState(initial?.showPhone ?? true);
   const [isUrgent, setIsUrgent] = useState(initial?.isUrgent ?? false);
   const [storeId, setStoreId] = useState<string>(initial?.storeId ?? "");
+  const [agentId, setAgentId] = useState<string>(initial?.agentId ?? "");
   const [isNegotiable, setIsNegotiable] = useState(initial?.isNegotiable ?? false);
   const [acceptsSwap, setAcceptsSwap] = useState(initial?.acceptsSwap ?? false);
   const [securePayment, setSecurePayment] = useState(initial?.securePayment ?? false);
+
+  // Kısa dönem kiralama (günlük/haftalık rezervasyon)
+  const [rentable, setRentable] = useState(initial?.rentable ?? false);
+  const [dailyPrice, setDailyPrice] = useState(initial?.dailyPrice ? String(initial.dailyPrice) : "");
+  const [weeklyPrice, setWeeklyPrice] = useState(initial?.weeklyPrice ? String(initial.weeklyPrice) : "");
+  const [monthlyPrice, setMonthlyPrice] = useState(initial?.monthlyPrice ? String(initial.monthlyPrice) : "");
+  const [cleaningFee, setCleaningFee] = useState(initial?.cleaningFee ? String(initial.cleaningFee) : "");
+  const [rentDeposit, setRentDeposit] = useState(initial?.rentDeposit ? String(initial.rentDeposit) : "");
+  const [minNights, setMinNights] = useState(initial?.minNights ? String(initial.minNights) : "");
+  const [maxNights, setMaxNights] = useState(initial?.maxNights ? String(initial.maxNights) : "");
+  const [maxGuests, setMaxGuests] = useState(initial?.maxGuests ? String(initial.maxGuests) : "");
+  const [instantBook, setInstantBook] = useState(initial?.instantBook ?? false);
 
   const [uploading, setUploading] = useState(false);
 
@@ -163,6 +179,7 @@ export default function ListingForm({
       type,
       categoryId,
       storeId: storeId || null,
+      agentId: storeId && agentId ? agentId : null,
       city,
       district,
       neighborhood,
@@ -180,6 +197,16 @@ export default function ListingForm({
       isNegotiable,
       acceptsSwap,
       securePayment,
+      rentable,
+      dailyPrice: dailyPrice ? Number(dailyPrice) : null,
+      weeklyPrice: weeklyPrice ? Number(weeklyPrice) : null,
+      monthlyPrice: monthlyPrice ? Number(monthlyPrice) : null,
+      cleaningFee: cleaningFee ? Number(cleaningFee) : null,
+      rentDeposit: rentDeposit ? Number(rentDeposit) : null,
+      minNights: minNights ? Number(minNights) : null,
+      maxNights: maxNights ? Number(maxNights) : null,
+      maxGuests: maxGuests ? Number(maxGuests) : null,
+      instantBook,
     };
 
     start(async () => {
@@ -214,12 +241,22 @@ export default function ListingForm({
           )}
         </div>
         {userStore && (
-          <div className="mt-3">
+          <div className="mt-3 space-y-3">
             <Checkbox
               checked={storeId === userStore.id}
-              onChange={(v) => setStoreId(v ? userStore.id : "")}
+              onChange={(v) => { setStoreId(v ? userStore.id : ""); if (!v) setAgentId(""); }}
               label={`Bu ilanı "${userStore.name}" mağazamda yayınla`}
             />
+            {storeId === userStore.id && storeAgents.length > 0 && (
+              <Field label="Danışman ata (opsiyonel)">
+                <select value={agentId} onChange={(e) => setAgentId(e.target.value)} className={inputCls}>
+                  <option value="">Danışman seçilmedi</option>
+                  {storeAgents.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
           </div>
         )}
       </Card>
@@ -304,32 +341,20 @@ export default function ListingForm({
 
       {/* Görseller */}
       <Card title="Fotoğraflar">
-        <div className="flex flex-wrap gap-3">
-          {images.map((img, i) => (
-            <div key={img} className="relative h-24 w-24 overflow-hidden rounded-lg border border-gray-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img} alt="" className="h-full w-full object-cover" />
-              <button
-                type="button"
-                onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
-                className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white"
-              >
-                ✕
-              </button>
-              {i === 0 && (
-                <span className="absolute bottom-0 left-0 right-0 bg-yellow-400 text-center text-[10px] font-bold text-gray-900">
-                  Vitrin
-                </span>
-              )}
-            </div>
-          ))}
+        <SortableImages
+          images={images}
+          onReorder={setImages}
+          onRemove={(i) => setImages((prev) => prev.filter((_, idx) => idx !== i))}
+        >
           <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-gray-600 hover:border-yellow-400">
             <span className="text-2xl">+</span>
             <span className="text-[10px]">{uploading ? "Yükleniyor..." : "Fotoğraf"}</span>
             <input type="file" accept="image/*" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
           </label>
-        </div>
-        <p className="mt-2 text-xs text-gray-600">İlk fotoğraf vitrin görseli olarak kullanılır.</p>
+        </SortableImages>
+        <p className="mt-2 text-xs text-gray-600">
+          İlk fotoğraf vitrin görseli olur. Sürükleyerek sıralayabilirsiniz.
+        </p>
       </Card>
 
       {/* Emlak medya: kat planı + video + 360° */}
@@ -459,6 +484,103 @@ export default function ListingForm({
           <Checkbox checked={acceptsSwap} onChange={setAcceptsSwap} label="Takasa açık" />
           <Checkbox checked={securePayment} onChange={setSecurePayment} label="Güvenli ödeme kabul ediyorum" />
         </div>
+      </Card>
+
+      <Card title="Kısa Dönem Kiralama (Günlük / Haftalık)">
+        <Checkbox
+          checked={rentable}
+          onChange={setRentable}
+          label="Bu ilanı günlük/haftalık rezervasyona aç"
+        />
+        {rentable && (
+          <div className="mt-3 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Günlük Fiyat *">
+                <input
+                  type="number"
+                  min={0}
+                  value={dailyPrice}
+                  onChange={(e) => setDailyPrice(e.target.value)}
+                  placeholder="örn. 1500"
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Haftalık Fiyat">
+                <input
+                  type="number"
+                  min={0}
+                  value={weeklyPrice}
+                  onChange={(e) => setWeeklyPrice(e.target.value)}
+                  placeholder="indirimli olabilir"
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Aylık Fiyat">
+                <input
+                  type="number"
+                  min={0}
+                  value={monthlyPrice}
+                  onChange={(e) => setMonthlyPrice(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Temizlik Ücreti (tek seferlik)">
+                <input
+                  type="number"
+                  min={0}
+                  value={cleaningFee}
+                  onChange={(e) => setCleaningFee(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Güvenlik Depozitosu (iade edilebilir)">
+                <input
+                  type="number"
+                  min={0}
+                  value={rentDeposit}
+                  onChange={(e) => setRentDeposit(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="En Az Gece">
+                <input
+                  type="number"
+                  min={1}
+                  value={minNights}
+                  onChange={(e) => setMinNights(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="En Çok Gece">
+                <input
+                  type="number"
+                  min={1}
+                  value={maxNights}
+                  onChange={(e) => setMaxNights(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Maks. Misafir">
+                <input
+                  type="number"
+                  min={1}
+                  value={maxGuests}
+                  onChange={(e) => setMaxGuests(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+            </div>
+            <Checkbox
+              checked={instantBook}
+              onChange={setInstantBook}
+              label="Anında rezervasyon (onaysız — ödeme sonrası otomatik onaylanır)"
+            />
+          </div>
+        )}
       </Card>
 
       {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}

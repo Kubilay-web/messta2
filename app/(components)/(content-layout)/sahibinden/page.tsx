@@ -22,21 +22,21 @@ export default async function SahibindenHome() {
   ]);
 
   return (
-    <div className="space-y-8">
+    <div className="w-full space-y-6 sm:space-y-8">
       {/* Hero */}
-      <section className="overflow-hidden rounded-2xl bg-gradient-to-r from-yellow-400 to-amber-400 p-6 sm:p-10">
-        <h1 className="text-2xl font-extrabold text-gray-900 sm:text-4xl">
+      <section className="overflow-hidden rounded-xl bg-gradient-to-r from-yellow-400 to-amber-400 p-5 sm:rounded-2xl sm:p-8 lg:p-10">
+        <h1 className="text-xl font-extrabold leading-tight text-gray-900 sm:text-3xl lg:text-4xl">
           Aradığın her şey bir tık uzağında
         </h1>
         <p className="mt-2 max-w-xl text-sm text-gray-800 sm:text-base">
           Emlak, vasıta, ikinci el ve sıfır ürünler — milyonlarca ilan arasından seç.
         </p>
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2 sm:mt-5">
           {categories.slice(0, 5).map((c) => (
             <Link
               key={c.id}
               href={`/sahibinden/kategori/${c.slug}`}
-              className="rounded-full bg-white/90 px-4 py-1.5 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-white"
+              className="rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-white sm:px-4 sm:text-sm"
             >
               {c.icon} {c.name}
             </Link>
@@ -46,16 +46,16 @@ export default async function SahibindenHome() {
 
       {/* Kategoriler */}
       <section>
-        <h2 className="mb-3 text-lg font-bold text-gray-800">Kategoriler</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <h2 className="mb-3 text-base font-bold text-gray-800 sm:text-lg">Kategoriler</h2>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-6">
           {categories.map((c) => (
             <Link
               key={c.id}
               href={`/sahibinden/kategori/${c.slug}`}
-              className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white p-4 text-center transition hover:border-yellow-400 hover:shadow-md"
+              className="flex flex-col items-center gap-1.5 rounded-xl border border-gray-200 bg-white p-3 text-center transition hover:border-yellow-400 hover:shadow-md sm:gap-2 sm:p-4"
             >
-              <span className="text-3xl">{c.icon}</span>
-              <span className="text-sm font-medium text-gray-700">{c.name}</span>
+              <span className="text-2xl sm:text-3xl">{c.icon}</span>
+              <span className="text-xs font-medium text-gray-700 sm:text-sm">{c.name}</span>
             </Link>
           ))}
         </div>
@@ -64,13 +64,13 @@ export default async function SahibindenHome() {
       {/* Vitrin / Öne çıkanlar */}
       {featured.length > 0 && (
         <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-800">Vitrindeki İlanlar</h2>
-            <Link href="/sahibinden/ara" className="text-sm font-semibold text-yellow-600 hover:underline">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-base font-bold text-gray-800 sm:text-lg">Vitrindeki İlanlar</h2>
+            <Link href="/sahibinden/ara" className="shrink-0 text-xs font-semibold text-yellow-600 hover:underline sm:text-sm">
               Tümünü gör →
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5">
             {featured.map((l) => (
               <ListingCard key={l.id} listing={l} favorited={favIds.has(l.id)} />
             ))}
@@ -81,8 +81,8 @@ export default async function SahibindenHome() {
       {/* Son gezdiklerin */}
       {recent.length > 0 && (
         <section>
-          <h2 className="mb-3 text-lg font-bold text-gray-800">Son Gezdiğin İlanlar</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <h2 className="mb-3 text-base font-bold text-gray-800 sm:text-lg">Son Gezdiğin İlanlar</h2>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5">
             {recent.map((l: any) => (
               <ListingCard key={l.id} listing={l} favorited={favIds.has(l.id)} />
             ))}
@@ -92,16 +92,16 @@ export default async function SahibindenHome() {
 
       {/* Son ilanlar */}
       <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-800">Son Eklenen İlanlar</h2>
-          <Link href="/sahibinden/ara" className="text-sm font-semibold text-yellow-600 hover:underline">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-base font-bold text-gray-800 sm:text-lg">Son Eklenen İlanlar</h2>
+          <Link href="/sahibinden/ara" className="shrink-0 text-xs font-semibold text-yellow-600 hover:underline sm:text-sm">
             Tümünü gör →
           </Link>
         </div>
         {latest.items.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5">
             {latest.items.map((l) => (
               <ListingCard key={l.id} listing={l} favorited={favIds.has(l.id)} />
             ))}

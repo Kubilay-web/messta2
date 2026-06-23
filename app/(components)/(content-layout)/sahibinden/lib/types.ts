@@ -6,13 +6,21 @@ export interface ListingFilters {
   type?: string;
   city?: string;
   district?: string;
+  neighborhood?: string;
   minPrice?: number;
   maxPrice?: number;
   currency?: string;
-  sort?: "newest" | "oldest" | "price_asc" | "price_desc";
+  sort?: "newest" | "oldest" | "price_asc" | "price_desc" | "area_asc" | "area_desc";
   page?: number;
   perPage?: number;
+  /** Tam eşleşen attribute filtreleri (select / boolean / text). */
   attrs?: Record<string, string>;
+  /** Çoklu-seçim attribute filtreleri (örn. rooms: ["2+1","3+1"]) → $in. */
+  attrIn?: Record<string, string[]>;
+  /** Sayısal attribute aralık filtreleri (örn. grossArea, buildingAge, km). */
+  attrRanges?: Record<string, { min?: number; max?: number }>;
+  /** Harita alanı (bounding box) filtresi. */
+  bbox?: { south: number; west: number; north: number; east: number };
   userId?: string;
   onlyActive?: boolean;
 }
@@ -26,6 +34,7 @@ export interface ListingFormInput {
   type: string;
   categoryId: string;
   storeId?: string | null;
+  agentId?: string | null;
   city?: string;
   district?: string;
   neighborhood?: string;
@@ -44,6 +53,17 @@ export interface ListingFormInput {
   isNegotiable?: boolean;
   acceptsSwap?: boolean;
   securePayment?: boolean;
+  // Kısa dönem kiralama (günlük/haftalık rezervasyon)
+  rentable?: boolean;
+  dailyPrice?: number | null;
+  weeklyPrice?: number | null;
+  monthlyPrice?: number | null;
+  cleaningFee?: number | null;
+  rentDeposit?: number | null;
+  minNights?: number | null;
+  maxNights?: number | null;
+  maxGuests?: number | null;
+  instantBook?: boolean;
 }
 
 export interface ActionResult<T = unknown> {

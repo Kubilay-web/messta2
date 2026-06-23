@@ -6,6 +6,8 @@ const SORTS: { value: string; label: string }[] = [
   { value: "newest", label: "En Yeni" },
   { value: "price_asc", label: "Fiyat (Artan)" },
   { value: "price_desc", label: "Fiyat (Azalan)" },
+  { value: "area_desc", label: "m² (Büyükten)" },
+  { value: "area_asc", label: "m² (Küçükten)" },
   { value: "oldest", label: "En Eski" },
 ];
 

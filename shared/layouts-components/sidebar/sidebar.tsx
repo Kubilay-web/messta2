@@ -744,12 +744,18 @@ const Sidebar = ({ local_varaiable, ThemeChanger }: any) => {
       >
         <div className="main-sidebar-header">
           <div className="header-logo relative">
-            <Image
+            {/* <Image
               fill
               src="/assets/images/logo.png"
               alt="logo"
               className="desktop-logo"
-            />
+            /> */}
+            {/* Emlak logosu */}
+            <Link href="/sahibinden" className="desktop-logo flex items-center">
+              <span className="rounded bg-yellow-400 px-2 py-1 text-lg font-extrabold leading-none text-gray-900">
+                emlak
+              </span>
+            </Link>
             <Image
               fill
               src="/assets/images/logo.png"

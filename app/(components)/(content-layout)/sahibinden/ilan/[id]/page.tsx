@@ -10,6 +10,9 @@ import {
   getUserRating,
   getTopCategorySlug,
   getRegionPriceStats,
+  getListingStats,
+  getRegionReport,
+  isUserBlocked,
 } from "../../data";
 import { incrementView, recordRecentView } from "../../actions";
 import { formatPrice, formatDate, timeAgo } from "../../lib/format";
@@ -27,6 +30,13 @@ import AppointmentForm from "../../components/appointment-form";
 import DepositButton from "../../components/deposit-button";
 import CompareButton from "../../components/compare-button";
 import EmlakFeaturesView from "../../components/emlak-features-view";
+import StatsChart from "../../components/stats-chart";
+import RegionReportChart from "../../components/region-report-chart";
+import PrintButton from "../../components/print-button";
+import BlockButton from "../../components/block-button";
+import BookingWidget from "../../components/booking-widget";
+import { walletBalance } from "../../wallet";
+import { paypalEnabled } from "../../lib/paypal";
 import type { EmlakFeatures } from "../../lib/emlak-features";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +71,13 @@ export default async function ListingDetail({ params }: { params: Promise<{ id: 
   const isEmlak = topSlug === "emlak";
   const grossArea = Number((listing.attributes as Record<string, unknown> | null)?.grossArea) || 0;
 
+  const isOwnerEarly = user?.id === listing.userId;
+  const [listingStats, regionReport, blockedByMe] = await Promise.all([
+    isOwnerEarly ? getListingStats(listing.id, 14) : Promise.resolve([]),
+    isEmlak ? getRegionReport(listing.categoryId, listing.city) : Promise.resolve(null),
+    user && !isOwnerEarly ? isUserBlocked(user.id, listing.userId) : Promise.resolve(false),
+  ]);
+
   const sellerReviewDto = sellerReviews.map((r) => ({
     id: r.id,
     rating: r.rating,
@@ -77,6 +94,7 @@ export default async function ListingDetail({ params }: { params: Promise<{ id: 
   );
   const place = [listing.city, listing.district, listing.neighborhood].filter(Boolean).join(" / ");
   const isOwner = user?.id === listing.userId;
+  const rentBalance = user && listing.rentable && listing.dailyPrice ? await walletBalance(user.id) : 0;
 
   function attrValue(v: unknown) {
     if (v === true) return "Evet";
@@ -234,6 +252,22 @@ export default async function ListingDetail({ params }: { params: Promise<{ id: 
             </div>
           </div>
 
+          {listing.rentable && listing.dailyPrice && (
+            <BookingWidget
+              listingId={listing.id}
+              dailyPrice={listing.dailyPrice}
+              weeklyPrice={listing.weeklyPrice}
+              currency={listing.currency}
+              minNights={listing.minNights}
+              maxGuests={listing.maxGuests}
+              instantBook={listing.instantBook}
+              isLoggedIn={!!user}
+              isOwner={isOwner}
+              walletBalance={rentBalance}
+              paypalEnabled={paypalEnabled}
+            />
+          )}
+
           {isEmlak && (
             <AppointmentForm listingId={listing.id} isOwner={isOwner} isLoggedIn={!!user} />
           )}
@@ -280,14 +314,48 @@ export default async function ListingDetail({ params }: { params: Promise<{ id: 
             </span>
           </div>
 
+          {listing.agent && (
+            <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3">
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-gray-100">
+                {listing.agent.photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={listing.agent.photo} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center text-sm font-bold text-gray-600">
+                    {listing.agent.name[0]?.toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-gray-800">{listing.agent.name}</p>
+                <p className="truncate text-xs text-gray-600">{listing.agent.title || "Danışman"}</p>
+              </div>
+              {listing.agent.phone && (
+                <a href={`tel:${listing.agent.phone}`} className="rounded-lg bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
+                  {listing.agent.phone}
+                </a>
+              )}
+            </div>
+          )}
+
           <ContactSeller
             listingId={listing.id}
             phone={listing.contactPhone}
             showPhone={listing.showPhone}
             contactName={listing.contactName || listing.user.displayName || listing.user.name}
+            sellerId={listing.userId}
+            sellerName={listing.user.displayName || listing.user.name || listing.contactName || "Üye"}
+            sellerAvatar={listing.user.avatarUrl ?? null}
             isOwner={isOwner}
             isLoggedIn={!!user}
           />
+
+          <PrintButton />
+          {!isOwner && (
+            <div className="rounded-xl border border-gray-200 bg-white p-3">
+              <BlockButton targetUserId={listing.userId} initialBlocked={blockedByMe} isLoggedIn={!!user} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -305,6 +373,13 @@ export default async function ListingDetail({ params }: { params: Promise<{ id: 
           </dl>
           <p className="mt-3 text-xs text-gray-600">İlan tarihi: {formatDate(listing.createdAt)}</p>
         </section>
+      )}
+
+      {/* İlan istatistikleri (sadece ilan sahibi) */}
+      {isOwner && listingStats.length > 0 && (
+        <div className="mt-5">
+          <StatsChart data={listingStats} />
+        </div>
       )}
 
       {/* Emlak detaylı özellik matrisi */}
@@ -339,6 +414,13 @@ export default async function ListingDetail({ params }: { params: Promise<{ id: 
               : "Bu ilan bölge ortalamasının üzerinde."}
           </p>
         </section>
+      )}
+
+      {/* Zaman serili bölge raporu */}
+      {isEmlak && regionReport && (
+        <div className="mt-5">
+          <RegionReportChart months={regionReport} city={listing.city} currency={listing.currency} />
+        </div>
       )}
 
       {/* Kredi hesaplama (emlak satılık) */}

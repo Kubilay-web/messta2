@@ -2,13 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { sendMessage, reportListing } from "../actions";
+import { sendMessage, reportListing, logCallRecord } from "../actions";
+import { newCallId } from "../lib/call-client";
+import VideoCall, { type CallSummary } from "./video-call";
 
 export default function ContactSeller({
   listingId,
   phone,
   showPhone,
   contactName,
+  sellerId,
+  sellerName,
+  sellerAvatar,
   isOwner,
   isLoggedIn,
 }: {
@@ -16,6 +21,9 @@ export default function ContactSeller({
   phone: string | null;
   showPhone: boolean;
   contactName: string | null;
+  sellerId?: string;
+  sellerName?: string;
+  sellerAvatar?: string | null;
   isOwner: boolean;
   isLoggedIn: boolean;
 }) {
@@ -25,7 +33,30 @@ export default function ContactSeller({
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const [reportOpen, setReportOpen] = useState(false);
+  const [call, setCall] = useState<{ callId: string; video: boolean } | null>(null);
   const router = useRouter();
+
+  function startCall(video: boolean) {
+    if (!isLoggedIn) {
+      router.push("/login");
+      return;
+    }
+    if (!sellerId) return;
+    setCall({ callId: newCallId(), video });
+  }
+
+  function handleCallClose(summary: CallSummary | null) {
+    setCall(null);
+    if (summary && sellerId) {
+      logCallRecord({
+        listingId,
+        otherId: sellerId,
+        outcome: summary.outcome,
+        duration: summary.duration,
+        video: summary.video,
+      }).catch(() => {});
+    }
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,6 +91,30 @@ export default function ContactSeller({
           </svg>
           {revealed ? phone : "Cep Telefonunu Göster"}
         </button>
+      )}
+
+      {!isOwner && sellerId && (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => startCall(true)}
+            className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M23 7l-7 5 7 5V7z" />
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+            </svg>
+            Görüntülü Ara
+          </button>
+          <button
+            onClick={() => startCall(false)}
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+            </svg>
+            Sesli Ara
+          </button>
+        </div>
       )}
 
       {!isOwner && (
@@ -100,6 +155,19 @@ export default function ContactSeller({
 
       {reportOpen && (
         <ReportBox listingId={listingId} onClose={() => setReportOpen(false)} />
+      )}
+
+      {call && sellerId && (
+        <VideoCall
+          callId={call.callId}
+          listingId={listingId}
+          otherId={sellerId}
+          otherName={sellerName || contactName || "Üye"}
+          otherAvatar={sellerAvatar}
+          video={call.video}
+          mode="caller"
+          onClose={handleCallClose}
+        />
       )}
     </div>
   );

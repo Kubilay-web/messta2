@@ -1,17 +1,37 @@
 import Link from "next/link";
 import { validateRequest } from "@/app/auth";
-import { getUserListings, getDopingPackages } from "../../data";
+import { getUserListings, getDopingPackages, getListingSubscriptionPlans } from "../../data";
 import MyListingRow from "../../components/my-listing-row";
+import type { ListingPlanVM } from "../../components/listing-subscribe-dialog";
+import { walletBalance } from "../../wallet";
+import { paypalEnabled } from "../../lib/paypal";
+import type { BillingInterval } from "../../lib/billing";
 
 export const dynamic = "force-dynamic";
 
 export default async function IlanlarimPage() {
   const { user } = await validateRequest();
   if (!user) return null;
-  const [listings, dopingPackages] = await Promise.all([
+  const [listings, dopingPackages, subPlans, balance] = await Promise.all([
     getUserListings(user.id),
     getDopingPackages(),
+    getListingSubscriptionPlans(),
+    walletBalance(user.id),
   ]);
+
+  const subscriptionPlans: ListingPlanVM[] = subPlans.map((p) => ({
+    id: p.id,
+    name: p.name,
+    kind: p.kind as "DOPING_AUTO" | "LISTING_HOSTING",
+    interval: p.interval as BillingInterval,
+    intervalCount: p.intervalCount,
+    price: p.price,
+    currency: p.currency,
+    trialDays: p.trialDays,
+    features: p.features,
+    badge: p.badge,
+    dopingType: p.dopingType,
+  }));
 
   return (
     <div>
@@ -32,7 +52,14 @@ export default async function IlanlarimPage() {
       ) : (
         <div className="space-y-3">
           {listings.map((l) => (
-            <MyListingRow key={l.id} listing={l} dopingPackages={dopingPackages} />
+            <MyListingRow
+              key={l.id}
+              listing={l}
+              dopingPackages={dopingPackages}
+              subscriptionPlans={subscriptionPlans}
+              walletBalance={balance}
+              paypalEnabled={paypalEnabled}
+            />
           ))}
         </div>
       )}

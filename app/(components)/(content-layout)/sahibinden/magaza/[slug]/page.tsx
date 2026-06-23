@@ -4,6 +4,7 @@ import { validateRequest } from "@/app/auth";
 import {
   getStoreBySlug,
   getStoreListings,
+  getStoreAgents,
   getUserReviews,
   getUserRating,
   getUserFavoriteIds,
@@ -35,11 +36,12 @@ export default async function StorePage({
   if (!store) notFound();
 
   const { user } = await validateRequest();
-  const [{ items, total, pages }, reviews, rating, favIds] = await Promise.all([
+  const [{ items, total, pages }, reviews, rating, favIds, agents] = await Promise.all([
     getStoreListings(store.id, Number(page) || 1),
     getUserReviews(store.owner.id),
     getUserRating(store.owner.id),
     user ? getUserFavoriteIds(user.id) : Promise.resolve(new Set<string>()),
+    getStoreAgents(store.id),
   ]);
 
   const reviewDto = reviews.map((r) => ({
@@ -102,6 +104,34 @@ export default async function StorePage({
         </div>
         {store.about && <p className="border-t border-gray-100 p-4 text-sm text-gray-600">{store.about}</p>}
       </div>
+
+      {/* Danışmanlar */}
+      {agents.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-3 text-lg font-bold text-gray-800">Danışmanlarımız ({agents.length})</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {agents.map((a) => (
+              <div key={a.id} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3">
+                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-gray-100">
+                  {a.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={a.photo} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-sm font-bold text-gray-600">
+                      {a.name[0]?.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-800">{a.name}</p>
+                  <p className="truncate text-xs text-gray-600">{a.title || "Danışman"}</p>
+                  {a.phone && <p className="truncate text-xs text-green-600">{a.phone}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* İlanlar */}
       <section className="mt-6">

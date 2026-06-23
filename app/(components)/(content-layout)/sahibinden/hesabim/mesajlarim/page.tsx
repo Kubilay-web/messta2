@@ -30,6 +30,12 @@ export default async function MesajlarimPage() {
         mine: m.senderId === user.id,
         createdAt: new Date(m.createdAt).toISOString(),
         isRead: m.isRead,
+        kind: m.kind ?? "TEXT",
+        imageUrl: m.imageUrl ?? null,
+        callOutcome: m.callOutcome ?? null,
+        callDuration: m.callDuration ?? null,
+        callVideo: m.callVideo ?? true,
+        deleted: !!m.deletedAt,
       })),
   }));
 

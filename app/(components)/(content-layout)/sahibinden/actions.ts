@@ -16,6 +16,53 @@ async function requireUser() {
   return user;
 }
 
+/** Kısa dönem kiralama alanlarını forma göre normalize eder. */
+function rentalFields(input: ListingFormInput) {
+  const num = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const int = (v: unknown) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+  };
+  const rentable = !!input.rentable;
+  return {
+    rentable,
+    dailyPrice: rentable ? num(input.dailyPrice) : null,
+    weeklyPrice: rentable ? num(input.weeklyPrice) : null,
+    monthlyPrice: rentable ? num(input.monthlyPrice) : null,
+    cleaningFee: rentable ? num(input.cleaningFee) : null,
+    rentDeposit: rentable ? num(input.rentDeposit) : null,
+    minNights: rentable ? int(input.minNights) : null,
+    maxNights: rentable ? int(input.maxNights) : null,
+    maxGuests: rentable ? int(input.maxGuests) : null,
+    instantBook: rentable ? !!input.instantBook : false,
+  };
+}
+
+/** attributes JSON'undan indeksli/denormalize alanları türetir (m², bina yaşı). */
+function deriveDenormalized(attributes?: Record<string, unknown> | null) {
+  const a = (attributes ?? {}) as Record<string, unknown>;
+  const grossArea = Number(a.grossArea);
+  const buildingAge = Number(a.buildingAge);
+  return {
+    areaGross: Number.isFinite(grossArea) && grossArea > 0 ? grossArea : null,
+    buildingAge: Number.isFinite(buildingAge) && buildingAge >= 0 ? Math.round(buildingAge) : null,
+  };
+}
+
+/** Çakışmayan (benzersiz) bir ilan numarası üretir. */
+async function uniqueListingNo(): Promise<number> {
+  let n = genListingNo();
+  for (let i = 0; i < 8; i++) {
+    const exists = await prisma.shListing.findUnique({ where: { listingNo: n }, select: { id: true } });
+    if (!exists) return n;
+    n = genListingNo();
+  }
+  return n;
+}
+
 // ---------------------------------------------------------------------------
 //  İlan oluştur / güncelle / sil
 // ---------------------------------------------------------------------------
@@ -29,12 +76,7 @@ export async function createListing(input: ListingFormInput): Promise<ActionResu
   if (!(input.price >= 0)) return { ok: false, error: "Geçerli bir fiyat giriniz." };
 
   // benzersiz ilan no üret (çok düşük ihtimalli çakışmaya karşı birkaç deneme)
-  let listingNo = genListingNo();
-  for (let i = 0; i < 5; i++) {
-    const exists = await prisma.shListing.findUnique({ where: { listingNo } });
-    if (!exists) break;
-    listingNo = genListingNo();
-  }
+  const listingNo = await uniqueListingNo();
 
   const created = await prisma.shListing.create({
     data: {
@@ -48,6 +90,7 @@ export async function createListing(input: ListingFormInput): Promise<ActionResu
       categoryId: input.categoryId,
       userId: user.id,
       storeId: input.storeId || null,
+      agentId: input.agentId || null,
       locationId: await resolveLocationId(input.city, input.district),
       city: input.city || null,
       district: input.district || null,
@@ -60,6 +103,7 @@ export async function createListing(input: ListingFormInput): Promise<ActionResu
       videoUrl: input.videoUrl || null,
       tourImageUrl: input.tourImageUrl || null,
       attributes: (input.attributes ?? {}) as any,
+      ...deriveDenormalized(input.attributes),
       contactName: input.contactName || user.displayName || null,
       contactPhone: input.contactPhone || null,
       showPhone: input.showPhone ?? true,
@@ -67,6 +111,7 @@ export async function createListing(input: ListingFormInput): Promise<ActionResu
       isNegotiable: input.isNegotiable ?? false,
       acceptsSwap: input.acceptsSwap ?? false,
       securePayment: input.securePayment ?? false,
+      ...rentalFields(input),
       status: "ACTIVE",
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
     },
@@ -205,6 +250,7 @@ export async function updateListing(input: ListingFormInput): Promise<ActionResu
       type: (input.type as any) || "SALE",
       categoryId: input.categoryId,
       storeId: input.storeId || null,
+      agentId: input.agentId || null,
       locationId: await resolveLocationId(input.city, input.district),
       city: input.city || null,
       district: input.district || null,
@@ -217,6 +263,7 @@ export async function updateListing(input: ListingFormInput): Promise<ActionResu
       videoUrl: input.videoUrl || null,
       tourImageUrl: input.tourImageUrl || null,
       attributes: (input.attributes ?? {}) as any,
+      ...deriveDenormalized(input.attributes),
       contactName: input.contactName || null,
       contactPhone: input.contactPhone || null,
       showPhone: input.showPhone ?? true,
@@ -224,6 +271,7 @@ export async function updateListing(input: ListingFormInput): Promise<ActionResu
       isNegotiable: input.isNegotiable ?? false,
       acceptsSwap: input.acceptsSwap ?? false,
       securePayment: input.securePayment ?? false,
+      ...rentalFields(input),
     },
   });
 
@@ -260,9 +308,18 @@ export async function setListingStatus(id: string, status: string): Promise<Acti
 //  Görüntülenme
 // ---------------------------------------------------------------------------
 
+function today() {
+  return new Date().toISOString().slice(0, 10); // yyyy-mm-dd
+}
+
 export async function incrementView(id: string) {
   try {
     await prisma.shListing.update({ where: { id }, data: { viewCount: { increment: 1 } } });
+    await prisma.shListingStat.upsert({
+      where: { listingId_date: { listingId: id, date: today() } },
+      update: { views: { increment: 1 } },
+      create: { listingId: id, date: today(), views: 1, favorites: 0 },
+    });
   } catch {
     /* sessizce geç */
   }
@@ -295,6 +352,11 @@ export async function toggleFavorite(listingId: string): Promise<ActionResult<{ 
     where: { id: listingId },
     data: { favoriteCount: { increment: 1 } },
   }).catch(() => {});
+  await prisma.shListingStat.upsert({
+    where: { listingId_date: { listingId, date: today() } },
+    update: { favorites: { increment: 1 } },
+    create: { listingId, date: today(), views: 0, favorites: 1 },
+  }).catch(() => {});
   revalidatePath("/sahibinden/hesabim/favorilerim");
   return { ok: true, data: { favorited: true } };
 }
@@ -321,9 +383,26 @@ async function deliverMessage(opts: {
   sellerId: string;
   content: string;
   listingTitle?: string;
+  kind?: "TEXT" | "IMAGE" | "CALL";
+  imageUrl?: string | null;
+  callOutcome?: string | null;
+  callDuration?: number | null;
+  callVideo?: boolean;
+  replyToId?: string | null;
 }) {
   const conv = await ensureConversation(opts.listingId, opts.senderId, opts.receiverId, opts.sellerId);
   const senderIsBuyer = conv.buyerId === opts.senderId;
+  const kind = opts.kind ?? "TEXT";
+
+  // Yanıtlanan mesaj gerçekten bu konuşmaya mı ait? (güvenlik)
+  let replyToId: string | null = null;
+  if (opts.replyToId) {
+    const parent = await prisma.shMessage.findFirst({
+      where: { id: opts.replyToId, conversationId: conv.id },
+      select: { id: true },
+    });
+    replyToId = parent?.id ?? null;
+  }
 
   await prisma.shMessage.create({
     data: {
@@ -332,8 +411,24 @@ async function deliverMessage(opts: {
       senderId: opts.senderId,
       receiverId: opts.receiverId,
       content: opts.content.trim(),
+      kind,
+      imageUrl: opts.imageUrl ?? null,
+      callOutcome: opts.callOutcome ?? null,
+      callDuration: opts.callDuration ?? null,
+      callVideo: opts.callVideo ?? true,
+      replyToId,
     },
   });
+
+  // Bildirim/önizleme metni türüne göre
+  const preview =
+    kind === "IMAGE"
+      ? "📷 Fotoğraf"
+      : kind === "CALL"
+        ? opts.callVideo === false
+          ? "📞 Sesli arama"
+          : "📹 Görüntülü arama"
+        : opts.content.trim();
 
   await prisma.shConversation.update({
     where: { id: conv.id },
@@ -349,36 +444,41 @@ async function deliverMessage(opts: {
     .update({ where: { id: opts.listingId }, data: { messageCount: { increment: 1 } } })
     .catch(() => {});
 
-  await prisma.shNotification
-    .create({
-      data: {
-        userId: opts.receiverId,
-        type: "NEW_MESSAGE",
-        title: "Yeni mesajınız var",
-        body: opts.content.trim().slice(0, 120),
-        link: "/sahibinden/hesabim/mesajlarim",
-        listingId: opts.listingId,
-      },
-    })
-    .catch(() => {});
+  // Arama kayıtları için ayrı bildirim üretme (arama akışı kendi bildirimini yönetir).
+  if (kind !== "CALL") {
+    await prisma.shNotification
+      .create({
+        data: {
+          userId: opts.receiverId,
+          type: "NEW_MESSAGE",
+          title: "Yeni mesajınız var",
+          body: preview.slice(0, 120),
+          link: "/sahibinden/hesabim/mesajlarim",
+          listingId: opts.listingId,
+        },
+      })
+      .catch(() => {});
+  }
 
-  // E-posta bildirimi (Resend)
-  try {
-    const [receiver, sender] = await Promise.all([
-      prisma.user.findUnique({ where: { id: opts.receiverId }, select: { email: true } }),
-      prisma.user.findUnique({ where: { id: opts.senderId }, select: { displayName: true, name: true, username: true } }),
-    ]);
-    if (receiver?.email) {
-      const senderName = sender?.displayName || sender?.name || sender?.username || "Bir kullanıcı";
-      const tpl = mailNewMessage({
-        senderName,
-        listingTitle: opts.listingTitle ?? "İlanınız",
-        preview: opts.content.trim(),
-      });
-      await sendMail({ to: receiver.email, ...tpl });
+  // E-posta bildirimi (Resend) — arama kayıtları hariç
+  if (kind !== "CALL") {
+    try {
+      const [receiver, sender] = await Promise.all([
+        prisma.user.findUnique({ where: { id: opts.receiverId }, select: { email: true } }),
+        prisma.user.findUnique({ where: { id: opts.senderId }, select: { displayName: true, name: true, username: true } }),
+      ]);
+      if (receiver?.email) {
+        const senderName = sender?.displayName || sender?.name || sender?.username || "Bir kullanıcı";
+        const tpl = mailNewMessage({
+          senderName,
+          listingTitle: opts.listingTitle ?? "İlanınız",
+          preview,
+        });
+        await sendMail({ to: receiver.email, ...tpl });
+      }
+    } catch {
+      /* mail hatası akışı bozmasın */
     }
-  } catch {
-    /* mail hatası akışı bozmasın */
   }
 
   return conv;
@@ -395,6 +495,8 @@ export async function sendMessage(listingId: string, content: string): Promise<A
   });
   if (!listing) return { ok: false, error: "İlan bulunamadı." };
   if (listing.userId === user.id) return { ok: false, error: "Kendi ilanınıza mesaj gönderemezsiniz." };
+  if (await isBlockedBetween(user.id, listing.userId))
+    return { ok: false, error: "Bu kullanıcıyla mesajlaşamazsınız." };
 
   await deliverMessage({
     listingId,
@@ -413,6 +515,7 @@ export async function replyMessage(
   listingId: string,
   receiverId: string,
   content: string,
+  replyToId?: string,
 ): Promise<ActionResult> {
   const user = await requireUser();
   if (!user) return { ok: false, error: "Giriş yapın." };
@@ -423,6 +526,8 @@ export async function replyMessage(
     select: { userId: true, title: true },
   });
   if (!listing) return { ok: false, error: "İlan bulunamadı." };
+  if (await isBlockedBetween(user.id, receiverId))
+    return { ok: false, error: "Bu kullanıcıyla mesajlaşamazsınız." };
 
   await deliverMessage({
     listingId,
@@ -431,9 +536,34 @@ export async function replyMessage(
     sellerId: listing.userId,
     content,
     listingTitle: listing.title,
+    replyToId: replyToId ?? null,
   });
 
   revalidatePath("/sahibinden/hesabim/mesajlarim");
+  return { ok: true };
+}
+
+/** Bir mesaja emoji reaksiyonu ekler/kaldırır (toggle). */
+export async function toggleReaction(messageId: string, emoji: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  if (!emoji?.trim()) return { ok: false, error: "Emoji gerekli." };
+
+  const msg = await prisma.shMessage.findUnique({
+    where: { id: messageId },
+    select: { senderId: true, receiverId: true, reactions: true },
+  });
+  if (!msg) return { ok: false, error: "Mesaj bulunamadı." };
+  if (msg.senderId !== user.id && msg.receiverId !== user.id)
+    return { ok: false, error: "Yetkiniz yok." };
+
+  const list = (Array.isArray(msg.reactions) ? msg.reactions : []) as { userId: string; emoji: string }[];
+  const existing = list.find((r) => r.userId === user.id && r.emoji === emoji);
+  const next = existing
+    ? list.filter((r) => !(r.userId === user.id && r.emoji === emoji)) // aynı emoji → kaldır
+    : [...list.filter((r) => r.userId !== user.id), { userId: user.id, emoji }]; // kullanıcı başına tek reaksiyon
+
+  await prisma.shMessage.update({ where: { id: messageId }, data: { reactions: next } });
   return { ok: true };
 }
 
@@ -444,7 +574,144 @@ export async function markConversationRead(listingId: string, otherUserId: strin
     where: { listingId, senderId: otherUserId, receiverId: user.id, isRead: false },
     data: { isRead: true },
   });
+  // konuşma sayaçlarını da sıfırla
+  const conv = await prisma.shConversation.findFirst({
+    where: {
+      listingId,
+      OR: [
+        { buyerId: user.id, sellerId: otherUserId },
+        { buyerId: otherUserId, sellerId: user.id },
+      ],
+    },
+    select: { id: true, buyerId: true },
+  });
+  if (conv) {
+    await prisma.shConversation.update({
+      where: { id: conv.id },
+      data: conv.buyerId === user.id ? { buyerUnread: 0 } : { sellerUnread: 0 },
+    }).catch(() => {});
+  }
   revalidatePath("/sahibinden/hesabim/mesajlarim");
+}
+
+/** Fotoğraf mesajı gönderir (Cloudinary URL'i client'tan gelir). */
+export async function replyImageMessage(
+  listingId: string,
+  receiverId: string,
+  imageUrl: string,
+  caption?: string,
+  replyToId?: string,
+): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  if (!imageUrl?.trim()) return { ok: false, error: "Görsel bulunamadı." };
+
+  const listing = await prisma.shListing.findUnique({
+    where: { id: listingId },
+    select: { userId: true, title: true },
+  });
+  if (!listing) return { ok: false, error: "İlan bulunamadı." };
+  if (await isBlockedBetween(user.id, receiverId))
+    return { ok: false, error: "Bu kullanıcıyla mesajlaşamazsınız." };
+
+  await deliverMessage({
+    listingId,
+    senderId: user.id,
+    receiverId,
+    sellerId: listing.userId,
+    content: caption?.trim() || "",
+    listingTitle: listing.title,
+    kind: "IMAGE",
+    imageUrl: imageUrl.trim(),
+    replyToId: replyToId ?? null,
+  });
+
+  revalidatePath("/sahibinden/hesabim/mesajlarim");
+  return { ok: true };
+}
+
+/** Bir mesajı (yalnızca gönderen) yumuşak siler. */
+export async function deleteMessage(messageId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  const msg = await prisma.shMessage.findUnique({ where: { id: messageId }, select: { senderId: true } });
+  if (!msg) return { ok: false, error: "Mesaj bulunamadı." };
+  if (msg.senderId !== user.id) return { ok: false, error: "Yalnızca kendi mesajınızı silebilirsiniz." };
+  await prisma.shMessage.update({
+    where: { id: messageId },
+    data: { deletedAt: new Date(), content: "", imageUrl: null },
+  });
+  revalidatePath("/sahibinden/hesabim/mesajlarim");
+  return { ok: true };
+}
+
+/** "yazıyor..." göstergesi: konuşmadaki rolüne göre tuş zamanını günceller. */
+export async function setTyping(listingId: string, otherId: string): Promise<void> {
+  const user = await requireUser();
+  if (!user) return;
+  const listing = await prisma.shListing.findUnique({ where: { id: listingId }, select: { userId: true } });
+  if (!listing) return;
+  const sellerId = listing.userId;
+  const buyerId = user.id === sellerId ? otherId : user.id;
+  const meIsBuyer = user.id === buyerId;
+  await prisma.shConversation
+    .update({
+      where: { listingId_buyerId_sellerId: { listingId, buyerId, sellerId } },
+      data: meIsBuyer ? { buyerTypingAt: new Date() } : { sellerTypingAt: new Date() },
+    })
+    .catch(() => {
+      // konuşma yoksa oluştur
+      return prisma.shConversation
+        .create({
+          data: {
+            listingId,
+            buyerId,
+            sellerId,
+            ...(meIsBuyer ? { buyerTypingAt: new Date() } : { sellerTypingAt: new Date() }),
+          },
+        })
+        .catch(() => {});
+    });
+}
+
+/** Çevrimiçi/son görülme: kullanıcının son aktiflik zamanını günceller. */
+export async function touchPresence(): Promise<void> {
+  const user = await requireUser();
+  if (!user) return;
+  await prisma.user.update({ where: { id: user.id }, data: { shLastSeenAt: new Date() } }).catch(() => {});
+}
+
+/** Görüntülü/sesli arama bittiğinde konuşmaya bir arama kaydı düşer. */
+export async function logCallRecord(opts: {
+  listingId: string;
+  otherId: string;
+  outcome: "answered" | "missed" | "rejected" | "cancelled";
+  duration?: number;
+  video?: boolean;
+}): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  const listing = await prisma.shListing.findUnique({
+    where: { id: opts.listingId },
+    select: { userId: true, title: true },
+  });
+  if (!listing) return { ok: false, error: "İlan bulunamadı." };
+
+  await deliverMessage({
+    listingId: opts.listingId,
+    senderId: user.id,
+    receiverId: opts.otherId,
+    sellerId: listing.userId,
+    content: "",
+    listingTitle: listing.title,
+    kind: "CALL",
+    callOutcome: opts.outcome,
+    callDuration: opts.duration ?? null,
+    callVideo: opts.video ?? true,
+  });
+
+  revalidatePath("/sahibinden/hesabim/mesajlarim");
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -740,10 +1007,14 @@ export async function requestViewing(params: {
   scheduledAt: string;
   note?: string;
   phone?: string;
+  mode?: "FACE_TO_FACE" | "VIDEO";
+  durationMin?: number;
 }): Promise<ActionResult> {
   const user = await requireUser();
   if (!user) return { ok: false, error: "Randevu için giriş yapın." };
   if (!params.scheduledAt) return { ok: false, error: "Tarih/saat seçiniz." };
+  if (new Date(params.scheduledAt).getTime() < Date.now() - 60_000)
+    return { ok: false, error: "Geçmiş bir zaman seçilemez." };
 
   const listing = await prisma.shListing.findUnique({
     where: { id: params.listingId },
@@ -752,12 +1023,45 @@ export async function requestViewing(params: {
   if (!listing) return { ok: false, error: "İlan bulunamadı." };
   if (listing.userId === user.id) return { ok: false, error: "Kendi ilanınıza randevu alamazsınız." };
 
+  const mode = params.mode === "VIDEO" ? "VIDEO" : "FACE_TO_FACE";
+  const durationMin = params.durationMin && params.durationMin > 0 ? Math.round(params.durationMin) : 30;
+
+  // Çakışma kontrolü: aynı ev sahibi VEYA aynı kiracı için zaman aralığı çakışması
+  const newStart = new Date(params.scheduledAt).getTime();
+  const newEnd = newStart + durationMin * 60_000;
+  const windowFrom = new Date(newStart - 24 * 60 * 60_000); // sorguyu daralt (geniş tampon)
+  const windowTo = new Date(newEnd);
+  const candidates = await prisma.shViewingAppointment.findMany({
+    where: {
+      status: { in: ["PENDING", "CONFIRMED"] },
+      scheduledAt: { gte: windowFrom, lte: windowTo },
+      OR: [{ ownerId: listing.userId }, { requesterId: user.id }],
+    },
+    select: { scheduledAt: true, durationMin: true, ownerId: true, requesterId: true },
+  });
+  const conflict = candidates.find((c) => {
+    const cStart = c.scheduledAt.getTime();
+    const cEnd = cStart + (c.durationMin ?? 30) * 60_000;
+    return newStart < cEnd && cStart < newEnd; // yarı-açık aralık çakışması
+  });
+  if (conflict) {
+    const mine = conflict.requesterId === user.id;
+    return {
+      ok: false,
+      error: mine
+        ? "Bu saatte zaten bir randevunuz var. Lütfen farklı bir saat seçin."
+        : "İlan sahibinin bu saatte başka bir randevusu var. Lütfen farklı bir saat seçin.",
+    };
+  }
+
   await prisma.shViewingAppointment.create({
     data: {
       listingId: params.listingId,
       requesterId: user.id,
       ownerId: listing.userId,
       scheduledAt: new Date(params.scheduledAt),
+      durationMin,
+      mode,
       note: params.note || null,
       phone: params.phone || null,
     },
@@ -768,8 +1072,8 @@ export async function requestViewing(params: {
       data: {
         userId: listing.userId,
         type: "NEW_MESSAGE",
-        title: "Yeni gezme randevusu talebi",
-        body: `${listing.title} için randevu talebi`,
+        title: mode === "VIDEO" ? "Yeni görüntülü görüşme talebi" : "Yeni gezme randevusu talebi",
+        body: `${listing.title} için ${mode === "VIDEO" ? "görüntülü görüşme" : "gezme"} randevu talebi`,
         link: "/sahibinden/hesabim/randevular",
         listingId: params.listingId,
       },
@@ -826,6 +1130,29 @@ export async function setAppointmentStatus(id: string, status: string): Promise<
     .catch(() => {});
 
   revalidatePath("/sahibinden/hesabim/randevular");
+  return { ok: true };
+}
+
+/** Görüntülü randevu görüşmesi başladı/bitti zaman damgası (taraflardan biri çağırır). */
+export async function markAppointmentCall(id: string, phase: "start" | "end"): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  const appt = await prisma.shViewingAppointment.findUnique({ where: { id } });
+  if (!appt) return { ok: false, error: "Randevu bulunamadı." };
+  if (appt.ownerId !== user.id && appt.requesterId !== user.id)
+    return { ok: false, error: "Yetkiniz yok." };
+
+  if (phase === "start") {
+    await prisma.shViewingAppointment.update({
+      where: { id },
+      data: { callStartedAt: appt.callStartedAt ?? new Date() },
+    });
+  } else {
+    await prisma.shViewingAppointment.update({
+      where: { id },
+      data: { callEndedAt: new Date(), status: appt.status === "CONFIRMED" ? "COMPLETED" : appt.status },
+    });
+  }
   return { ok: true };
 }
 
@@ -903,6 +1230,195 @@ export async function resolveReport(
   });
   revalidatePath("/sahibinden/admin");
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+//  İlan yenileme / süre
+// ---------------------------------------------------------------------------
+
+export async function renewListing(id: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  const listing = await prisma.shListing.findUnique({ where: { id } });
+  if (!listing || listing.userId !== user.id) return { ok: false, error: "Yetkiniz yok." };
+
+  await prisma.shListing.update({
+    where: { id },
+    data: {
+      status: "ACTIVE",
+      bumpedAt: new Date(),
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+    },
+  });
+  revalidatePath("/sahibinden/hesabim/ilanlarim");
+  revalidatePath(`/sahibinden/ilan/${id}`);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+//  Kullanıcı engelleme
+// ---------------------------------------------------------------------------
+
+export async function isBlockedBetween(a: string, b: string): Promise<boolean> {
+  const found = await prisma.shUserBlock.findFirst({
+    where: {
+      OR: [
+        { blockerId: a, blockedId: b },
+        { blockerId: b, blockedId: a },
+      ],
+    },
+  });
+  return !!found;
+}
+
+export async function blockUser(blockedId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  if (user.id === blockedId) return { ok: false, error: "Kendinizi engelleyemezsiniz." };
+  await prisma.shUserBlock
+    .upsert({
+      where: { blockerId_blockedId: { blockerId: user.id, blockedId } },
+      update: {},
+      create: { blockerId: user.id, blockedId },
+    })
+    .catch(() => {});
+  revalidatePath("/sahibinden/hesabim/engellenenler");
+  return { ok: true };
+}
+
+export async function unblockUser(blockedId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  await prisma.shUserBlock
+    .deleteMany({ where: { blockerId: user.id, blockedId } })
+    .catch(() => {});
+  revalidatePath("/sahibinden/hesabim/engellenenler");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+//  Danışman (Agent)
+// ---------------------------------------------------------------------------
+
+export interface AgentInput {
+  id?: string;
+  name: string;
+  title?: string;
+  phone?: string;
+  email?: string;
+  photo?: string;
+  bio?: string;
+}
+
+export async function upsertAgent(input: AgentInput): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  const store = await prisma.shStore.findFirst({ where: { ownerId: user.id } });
+  if (!store) return { ok: false, error: "Önce mağaza/ofis oluşturmalısınız." };
+  if (!input.name?.trim()) return { ok: false, error: "Danışman adı zorunludur." };
+
+  const data = {
+    name: input.name.trim(),
+    title: input.title || null,
+    phone: input.phone || null,
+    email: input.email || null,
+    photo: input.photo || null,
+    bio: input.bio || null,
+  };
+
+  if (input.id) {
+    const existing = await prisma.shAgent.findUnique({ where: { id: input.id } });
+    if (!existing || existing.storeId !== store.id) return { ok: false, error: "Yetkiniz yok." };
+    await prisma.shAgent.update({ where: { id: input.id }, data });
+  } else {
+    await prisma.shAgent.create({ data: { ...data, storeId: store.id } });
+  }
+  revalidatePath("/sahibinden/hesabim/danismanlar");
+  revalidatePath(`/sahibinden/magaza/${store.slug}`);
+  return { ok: true };
+}
+
+export async function deleteAgent(id: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  const store = await prisma.shStore.findFirst({ where: { ownerId: user.id } });
+  const agent = await prisma.shAgent.findUnique({ where: { id } });
+  if (!store || !agent || agent.storeId !== store.id) return { ok: false, error: "Yetkiniz yok." };
+  await prisma.shAgent.delete({ where: { id } });
+  revalidatePath("/sahibinden/hesabim/danismanlar");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+//  Toplu ilan yükleme (CSV)
+// ---------------------------------------------------------------------------
+
+export async function bulkCreateListings(csv: string): Promise<ActionResult<{ created: number; errors: string[] }>> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+
+  const store = await prisma.shStore.findFirst({ where: { ownerId: user.id } });
+  const cats = await prisma.shCategory.findMany({ where: { slug: { in: ["satilik-daire", "kiralik-daire"] } } });
+  const saleCat = cats.find((c) => c.slug === "satilik-daire");
+  const rentCat = cats.find((c) => c.slug === "kiralik-daire");
+  if (!saleCat || !rentCat) return { ok: false, error: "Kategoriler bulunamadı." };
+
+  const lines = csv.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return { ok: false, error: "CSV boş veya yalnızca başlık var." };
+
+  // başlık: title,price,type,city,district,rooms,m2,description
+  const errors: string[] = [];
+  let created = 0;
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",").map((c) => c.trim());
+    const [title, priceStr, typeStr, city, district, rooms, m2, description] = cols;
+    if (!title || !priceStr) {
+      errors.push(`Satır ${i + 1}: başlık/fiyat eksik`);
+      continue;
+    }
+    const type = (typeStr || "SALE").toUpperCase() === "RENT" ? "RENT" : "SALE";
+    const cat = type === "RENT" ? rentCat : saleCat;
+    const data = {
+      title,
+      slug: slugify(title),
+      description: description || title,
+      price: Number(priceStr) || 0,
+      currency: "TRY" as const,
+      type: type as any,
+      status: "ACTIVE" as const,
+      categoryId: cat.id,
+      userId: user.id,
+      storeId: store?.id ?? null,
+      city: city || null,
+      district: district || null,
+      attributes: { rooms: rooms || undefined, grossArea: m2 ? Number(m2) : undefined } as any,
+      areaGross: m2 ? Number(m2) || null : null,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+    };
+
+    // benzersiz listingNo + çakışmada (P2002) yeniden dene
+    let ok = false;
+    let failReason = "";
+    for (let attempt = 0; attempt < 4 && !ok; attempt++) {
+      try {
+        await prisma.shListing.create({ data: { ...data, listingNo: await uniqueListingNo() } });
+        ok = true;
+        created++;
+      } catch (e: any) {
+        if (e?.code === "P2002") {
+          failReason = "ilan no çakışması";
+          continue; // yeniden dene
+        }
+        failReason = "oluşturulamadı";
+        break;
+      }
+    }
+    if (!ok) errors.push(`Satır ${i + 1}: ${failReason || "oluşturulamadı"}`);
+  }
+
+  revalidatePath("/sahibinden/hesabim/ilanlarim");
+  return { ok: true, data: { created, errors } };
 }
 
 // ---------------------------------------------------------------------------

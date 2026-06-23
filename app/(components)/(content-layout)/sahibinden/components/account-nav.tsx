@@ -10,8 +10,14 @@ const ITEMS = [
   { href: "/sahibinden/hesabim/aramalarim", label: "Aramalarım" },
   { href: "/sahibinden/hesabim/randevular", label: "Randevular" },
   { href: "/sahibinden/hesabim/mesajlarim", label: "Mesajlarım" },
+  { href: "/sahibinden/hesabim/rezervasyonlarim", label: "Rezervasyonlarım" },
+  { href: "/sahibinden/hesabim/abonelikler", label: "Abonelikler & Planlar" },
+  { href: "/sahibinden/hesabim/cuzdan", label: "Cüzdanım" },
   { href: "/sahibinden/hesabim/bildirimler", label: "Bildirimler" },
   { href: "/sahibinden/hesabim/magaza", label: "Mağazam" },
+  { href: "/sahibinden/hesabim/danismanlar", label: "Danışmanlar" },
+  { href: "/sahibinden/hesabim/toplu-yukle", label: "Toplu Yükle" },
+  { href: "/sahibinden/hesabim/engellenenler", label: "Engellenenler" },
 ];
 
 export default function AccountNav() {

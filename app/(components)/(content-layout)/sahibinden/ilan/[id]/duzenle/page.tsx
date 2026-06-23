@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { validateRequest } from "@/app/auth";
-import { getCategoryTree, getListingById, getUserStore } from "../../../data";
+import { getCategoryTree, getListingById, getUserStoreAgents } from "../../../data";
 import ListingForm from "../../../components/listing-form";
 
 export const dynamic = "force-dynamic";
@@ -10,11 +10,12 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
   const { user } = await validateRequest();
   if (!user) redirect(`/login?redirect=/sahibinden/ilan/${id}/duzenle`);
 
-  const [listing, categories, store] = await Promise.all([
+  const [listing, categories, storeData] = await Promise.all([
     getListingById(id),
     getCategoryTree(),
-    getUserStore(user.id),
+    getUserStoreAgents(user.id),
   ]);
+  const store = storeData.store;
   if (!listing) notFound();
   if (listing.userId !== user.id) redirect(`/sahibinden/ilan/${id}`);
 
@@ -24,10 +25,12 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
       <ListingForm
         categories={categories}
         userStore={store ? { id: store.id, name: store.name } : null}
+        storeAgents={storeData.agents.map((a) => ({ id: a.id, name: a.name }))}
         defaultContact={{ name: listing.contactName ?? "", phone: listing.contactPhone ?? "" }}
         initial={{
           id: listing.id,
           storeId: listing.storeId,
+          agentId: listing.agentId,
           title: listing.title,
           description: listing.description,
           price: listing.price,
@@ -48,6 +51,19 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
           contactPhone: listing.contactPhone,
           showPhone: listing.showPhone,
           isUrgent: listing.isUrgent,
+          isNegotiable: listing.isNegotiable,
+          acceptsSwap: listing.acceptsSwap,
+          securePayment: listing.securePayment,
+          rentable: listing.rentable,
+          dailyPrice: listing.dailyPrice,
+          weeklyPrice: listing.weeklyPrice,
+          monthlyPrice: listing.monthlyPrice,
+          cleaningFee: listing.cleaningFee,
+          rentDeposit: listing.rentDeposit,
+          minNights: listing.minNights,
+          maxNights: listing.maxNights,
+          maxGuests: listing.maxGuests,
+          instantBook: listing.instantBook,
         }}
       />
     </div>
