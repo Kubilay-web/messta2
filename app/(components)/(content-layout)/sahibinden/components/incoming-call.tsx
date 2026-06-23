@@ -1,77 +1,84 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { pollIncoming, postSignal, type IncomingCall } from "../lib/call-client";
+import type { IncomingCall, CallSignalMsg } from "../lib/call-client";
 import { getRealtimeSocket } from "../lib/realtime";
 import VideoCall, { type CallSummary } from "./video-call";
 
 // Uygulama genelinde gelen aramaları dinler (sahibinden layout'unda mount edilir).
-// Sunucuda WebSocket olmadığından kısa aralıkla polling yapılır.
-export default function IncomingCallListener({ enabled }: { enabled: boolean }) {
+// Sinyalleşme tamamen Socket.IO üzerinden olur: "call:ring" ile zil çalar,
+// "call:signal" ile (cancel/end/reject) arayan vazgeçtiğinde açılır pencere kapanır.
+export default function IncomingCallListener({
+  enabled,
+  selfId,
+}: {
+  enabled: boolean;
+  selfId: string | null;
+}) {
   const [incoming, setIncoming] = useState<IncomingCall | null>(null);
   const [accepted, setAccepted] = useState<IncomingCall | null>(null);
   const dismissed = useRef<Set<string>>(new Set());
   const ringStop = useRef<(() => void) | null>(null);
+  // Eşzamanlı görüşme kontrolü için güncel "accepted" değerini ref'te tut.
+  const acceptedRef = useRef<IncomingCall | null>(null);
+  acceptedRef.current = accepted;
 
-  // Polling — sekme görünür değilken durur, dönünce hemen yeniden başlar.
-  // Böylece kullanıcı başka sekmedeyken sunucuya hiç istek gitmez.
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    let offRing: (() => void) | null = null;
-    let intervalMs = 5000; // socket yoksa hızlı polling
+    let off: () => void = () => {};
 
-    async function tick() {
-      // Görüşme açıkken veya sekme gizliyken yeni gelenleri dinleme
-      if (accepted || document.hidden) return;
-      const call = await pollIncoming();
-      if (!alive) return;
-      if (call && !dismissed.current.has(call.callId)) {
-        setIncoming(call);
-      } else if (!call) {
-        setIncoming(null);
-      }
-    }
+    getRealtimeSocket().then((sock) => {
+      if (!alive || !sock) return;
 
-    function start() {
-      if (timer) return;
-      tick(); // görünür olunca anında bir kez sor
-      timer = setInterval(tick, intervalMs);
-    }
-    function stop() {
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
-    }
-    function onVisibility() {
-      if (document.hidden) stop();
-      else start();
-    }
+      // Gelen arama zili
+      const onRing = (data: any) => {
+        if (!data || !data.callId || !data.fromId) return;
+        // Kendi kendine arama (aynı hesabın başka sekmesi) yankısını yok say.
+        if (selfId && data.fromId === selfId) return;
+        if (dismissed.current.has(data.callId)) return;
+        // Zaten görüşmedeysek meşgul döndür.
+        if (acceptedRef.current) {
+          sock.emit("call:signal", {
+            toId: data.fromId,
+            callId: data.callId,
+            type: "busy",
+            video: !!data.video,
+          });
+          return;
+        }
+        setIncoming({
+          callId: data.callId,
+          listingId: data.listingId,
+          fromId: data.fromId,
+          fromName: data.fromName || "Üye",
+          fromAvatar: data.fromAvatar ?? null,
+          listingTitle: data.listingTitle || "İlan",
+          video: !!data.video,
+        });
+      };
 
-    // Socket varsa: "call:ring" gelince anında DB'den çek; arka plan polling'i seyrekleştir.
-    getRealtimeSocket().then((s) => {
-      if (!alive || !s) return;
-      intervalMs = 25000; // güvenlik ağı (socket asıl tetikleyici)
-      const onRing = () => tick();
-      s.on("call:ring", onRing);
-      offRing = () => s.off("call:ring", onRing);
-      if (timer) {
-        stop();
-        start();
-      }
+      // Arayan biz kabul etmeden vazgeçerse açılır pencereyi kapat.
+      const onSignal = (data: CallSignalMsg) => {
+        if (!data || !data.callId) return;
+        if (data.type === "cancel" || data.type === "end" || data.type === "reject") {
+          setIncoming((cur) => (cur && cur.callId === data.callId ? null : cur));
+        }
+      };
+
+      sock.on("call:ring", onRing);
+      sock.on("call:signal", onSignal);
+      off = () => {
+        sock.off("call:ring", onRing);
+        sock.off("call:signal", onSignal);
+      };
     });
 
-    if (!document.hidden) start();
-    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       alive = false;
-      stop();
-      offRing?.();
-      document.removeEventListener("visibilitychange", onVisibility);
+      off();
     };
-  }, [enabled, accepted]);
+  }, [enabled, selfId]);
 
   // Zil sesi (gelen arama beklerken)
   useEffect(() => {
@@ -94,12 +101,13 @@ export default function IncomingCallListener({ enabled }: { enabled: boolean }) 
   function reject() {
     if (!incoming) return;
     dismissed.current.add(incoming.callId);
-    postSignal({
-      type: "reject",
-      callId: incoming.callId,
-      listingId: incoming.listingId,
-      toId: incoming.fromId,
-      video: incoming.video,
+    getRealtimeSocket().then((sock) => {
+      sock?.emit("call:signal", {
+        toId: incoming.fromId,
+        callId: incoming.callId,
+        type: "reject",
+        video: incoming.video,
+      });
     });
     ringStop.current?.();
     setIncoming(null);
@@ -122,6 +130,7 @@ export default function IncomingCallListener({ enabled }: { enabled: boolean }) 
         otherAvatar={accepted.fromAvatar}
         video={accepted.video}
         mode="callee"
+        listingTitle={accepted.listingTitle}
         onClose={handleClose}
       />
     );

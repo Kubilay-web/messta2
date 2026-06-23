@@ -38,7 +38,7 @@ export default async function SahibindenLayout({
       <Header user={headerUser} categories={categories} unread={unread} notifUnread={notifUnread} />
       <main className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-4 sm:py-6">{children}</main>
       <Footer />
-      <IncomingCallListener enabled={!!user} />
+      <IncomingCallListener enabled={!!user} selfId={user?.id ?? null} />
     </div>
   );
 }

@@ -696,6 +696,7 @@ function Thread({ conv, currentUserId, onBack }: { conv: ConvDTO; currentUserId:
           otherAvatar={conv.otherAvatar}
           video={call.video}
           mode="caller"
+          listingTitle={conv.listingTitle}
           onClose={handleCallClose}
         />
       )}
