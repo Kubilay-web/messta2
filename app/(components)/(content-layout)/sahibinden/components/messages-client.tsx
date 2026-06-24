@@ -9,6 +9,9 @@ import {
   deleteMessage,
   logCallRecord,
   toggleReaction,
+  sendVoiceMessage,
+  sendFileMessage,
+  editMessage,
 } from "../actions";
 import { formatPrice } from "../lib/format";
 import { newCallId, formatCallDuration } from "../lib/call-client";
@@ -35,8 +38,13 @@ export interface MsgDTO {
   mine: boolean;
   createdAt: string;
   isRead: boolean;
-  kind?: "TEXT" | "IMAGE" | "CALL";
+  kind?: "TEXT" | "IMAGE" | "CALL" | "VOICE" | "FILE";
   imageUrl?: string | null;
+  audioUrl?: string | null;
+  audioDuration?: number | null;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
   callOutcome?: string | null;
   callDuration?: number | null;
   callVideo?: boolean;
@@ -91,10 +99,10 @@ export default function MessagesClient({
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-[320px_1fr]">
+    <div className="grid gap-3 sm:gap-4 md:grid-cols-[300px_1fr] lg:grid-cols-[340px_1fr]">
       {/* Liste */}
-      <div className={`space-y-2 ${active ? "hidden md:block" : "block"}`}>
-        <div className="relative">
+      <div className={`flex min-h-0 flex-col gap-2 md:h-[72vh] ${active ? "hidden md:flex" : "flex"}`}>
+        <div className="relative shrink-0">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -102,7 +110,7 @@ export default function MessagesClient({
             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 pl-9 text-sm outline-none focus:border-yellow-400"
           />
           <svg
-            className="absolute left-3 top-2.5 text-gray-400"
+            className="absolute left-3 top-2.5 text-black"
             width="16"
             height="16"
             viewBox="0 0 24 24"
@@ -115,25 +123,27 @@ export default function MessagesClient({
           </svg>
         </div>
 
-        {filtered.map((c) => (
-          <ConversationItem
-            key={c.key}
-            conv={c}
-            active={c.key === activeKey}
-            onSelect={() => setActiveKey(c.key)}
-          />
-        ))}
-        {filtered.length === 0 && (
-          <p className="px-2 py-6 text-center text-sm text-gray-400">Sonuç bulunamadı.</p>
-        )}
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5">
+          {filtered.map((c) => (
+            <ConversationItem
+              key={c.key}
+              conv={c}
+              active={c.key === activeKey}
+              onSelect={() => setActiveKey(c.key)}
+            />
+          ))}
+          {filtered.length === 0 && (
+            <p className="px-2 py-6 text-center text-sm text-black">Sonuç bulunamadı.</p>
+          )}
+        </div>
       </div>
 
       {/* Thread */}
-      <div className={active ? "block" : "hidden md:block"}>
+      <div className={`min-w-0 ${active ? "block" : "hidden md:block"}`}>
         {active ? (
           <Thread key={active.key} conv={active} currentUserId={currentUserId} onBack={() => setActiveKey(null)} />
         ) : (
-          <div className="flex h-full items-center justify-center rounded-xl border border-gray-200 bg-white p-12 text-gray-600">
+          <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white p-12 text-center text-gray-600 md:h-[72vh]">
             Bir konuşma seçin
           </div>
         )}
@@ -146,6 +156,8 @@ function previewText(m?: MsgDTO): string {
   if (!m) return "";
   if (m.deleted) return "Bu mesaj silindi";
   if (m.kind === "IMAGE") return "📷 Fotoğraf";
+  if (m.kind === "VOICE") return "🎤 Sesli mesaj";
+  if (m.kind === "FILE") return `📎 ${m.fileName ?? "Dosya"}`;
   if (m.kind === "CALL") return m.callVideo === false ? "📞 Sesli arama" : "📹 Görüntülü arama";
   return m.content;
 }
@@ -205,10 +217,22 @@ function Thread({ conv, currentUserId, onBack }: { conv: ConvDTO; currentUserId:
   const [replyTo, setReplyTo] = useState<MsgDTO | null>(null);
   const [call, setCall] = useState<{ callId: string; video: boolean } | null>(null);
   const [pending, start] = useTransition();
+  const [recording, setRecording] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
 
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const docFileRef = useRef<HTMLInputElement>(null);
   const lastTypingSent = useRef(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recChunksRef = useRef<Blob[]>([]);
+  const recStreamRef = useRef<MediaStream | null>(null);
+  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recStartRef = useRef(0);
+  const recCancelRef = useRef(false);
 
   // Sunucu mesajlarını (gerçek id'li) birleştir; geçici (tmp-) olanları içerikle eşleştir.
   const mergeServer = useCallback((server: MsgDTO[]) => {
@@ -477,6 +501,162 @@ function Thread({ conv, currentUserId, onBack }: { conv: ConvDTO; currentUserId:
     });
   }
 
+  // Cloudinary'ye yükle ("video" sesli mesajlar için, "auto" dosyalar için).
+  async function uploadToCloudinary(file: Blob, resource: "video" | "auto"): Promise<string> {
+    if (!CLOUD || !PRESET) throw new Error("config");
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("upload_preset", PRESET);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/${resource}/upload`, {
+      method: "POST",
+      body: fd,
+    });
+    const json = await res.json();
+    if (!json.secure_url) throw new Error("upload");
+    return json.secure_url as string;
+  }
+
+  // ---- Sesli mesaj ----
+  async function startRecording() {
+    if (recording) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recStreamRef.current = stream;
+      const mr = new MediaRecorder(stream);
+      recChunksRef.current = [];
+      recCancelRef.current = false;
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) recChunksRef.current.push(e.data);
+      };
+      mr.onstop = onRecordingStop;
+      recorderRef.current = mr;
+      mr.start();
+      recStartRef.current = Date.now();
+      setRecording(true);
+      setRecSeconds(0);
+      recTimerRef.current = setInterval(
+        () => setRecSeconds(Math.round((Date.now() - recStartRef.current) / 1000)),
+        250,
+      );
+    } catch {
+      alert("Mikrofona erişilemedi.");
+    }
+  }
+
+  function finishRecorder() {
+    if (recTimerRef.current) {
+      clearInterval(recTimerRef.current);
+      recTimerRef.current = null;
+    }
+    const mr = recorderRef.current;
+    if (mr && mr.state !== "inactive") mr.stop();
+    setRecording(false);
+  }
+  function stopAndSendRecording() {
+    recCancelRef.current = false;
+    finishRecorder();
+  }
+  function cancelRecording() {
+    recCancelRef.current = true;
+    finishRecorder();
+  }
+
+  async function onRecordingStop() {
+    recStreamRef.current?.getTracks().forEach((t) => t.stop());
+    recStreamRef.current = null;
+    const duration = Math.max(1, Math.round((Date.now() - recStartRef.current) / 1000));
+    const chunks = recChunksRef.current;
+    recorderRef.current = null;
+    if (recCancelRef.current || chunks.length === 0) return;
+    const blob = new Blob(chunks, { type: chunks[0]?.type || "audio/webm" });
+    if (blob.size < 1200) return; // çok kısa kayıt
+    const localUrl = URL.createObjectURL(blob);
+    setMsgs((prev) => [
+      ...prev,
+      {
+        id: `tmp-${Date.now()}`,
+        content: "",
+        mine: true,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+        kind: "VOICE",
+        audioUrl: localUrl,
+        audioDuration: duration,
+      },
+    ]);
+    try {
+      const url = await uploadToCloudinary(blob, "video");
+      await sendVoiceMessage(conv.listingId, conv.otherId, url, duration);
+      emitRealtime("message:new", { convId: conv.key });
+    } catch {
+      alert("Sesli mesaj gönderilemedi.");
+    }
+  }
+
+  // ---- Dosya/PDF ----
+  async function sendDoc(file: File) {
+    if (!CLOUD || !PRESET) {
+      alert("Yükleme yapılandırması eksik.");
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      alert("Dosya 20MB'tan büyük olamaz.");
+      return;
+    }
+    setUploadingFile(true);
+    const localUrl = URL.createObjectURL(file);
+    setMsgs((prev) => [
+      ...prev,
+      {
+        id: `tmp-${Date.now()}`,
+        content: "",
+        mine: true,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+        kind: "FILE",
+        fileUrl: localUrl,
+        fileName: file.name,
+        fileSize: file.size,
+      },
+    ]);
+    try {
+      const url = await uploadToCloudinary(file, "auto");
+      await sendFileMessage(conv.listingId, conv.otherId, url, file.name, file.size);
+      emitRealtime("message:new", { convId: conv.key });
+    } catch {
+      alert("Dosya gönderilemedi.");
+    } finally {
+      setUploadingFile(false);
+      if (docFileRef.current) docFileRef.current.value = "";
+    }
+  }
+
+  // ---- Mesaj düzenleme ----
+  function beginEdit(m: MsgDTO) {
+    setEditingId(m.id);
+    setEditText(m.content);
+    setReplyTo(null);
+  }
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText("");
+  }
+  function submitEdit(e: React.FormEvent) {
+    e.preventDefault();
+    const id = editingId;
+    const t = editText.trim();
+    if (!id) return;
+    cancelEdit();
+    if (!t) return;
+    setMsgs((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, content: t, editedAt: new Date().toISOString() } : m)),
+    );
+    start(async () => {
+      await editMessage(id, t);
+      emitRealtime("message:new", { convId: conv.key });
+    });
+  }
+
   function startCall(video: boolean) {
     setCall({ callId: newCallId(), video });
   }
@@ -504,7 +684,7 @@ function Thread({ conv, currentUserId, onBack }: { conv: ConvDTO; currentUserId:
         : "";
 
   return (
-    <div className="flex h-[72vh] flex-col rounded-xl border border-gray-200 bg-white">
+    <div className="flex h-[80dvh] min-h-0 flex-col rounded-xl border border-gray-200 bg-white md:h-[72vh]">
       {/* başlık */}
       <div className="flex items-center gap-3 border-b border-gray-100 p-3">
         <button onClick={onBack} className="text-2xl leading-none text-gray-500 md:hidden" aria-label="Geri">
@@ -525,7 +705,7 @@ function Thread({ conv, currentUserId, onBack }: { conv: ConvDTO; currentUserId:
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-gray-800">{conv.otherName}</p>
-          <p className={`truncate text-xs ${presence.typing ? "text-green-600" : "text-gray-400"}`}>
+          <p className={`truncate text-xs ${presence.typing ? "text-green-600" : "text-black"}`}>
             {presenceLabel || conv.listingTitle}
           </p>
         </div>
@@ -572,16 +752,18 @@ function Thread({ conv, currentUserId, onBack }: { conv: ConvDTO; currentUserId:
       </Link>
 
       {/* mesajlar */}
-      <div className="flex-1 space-y-1 overflow-y-auto bg-gray-50/50 p-3">
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto bg-gray-50/50 p-3">
         {msgs.map((m, i) => (
           <MessageBubble
             key={m.id}
             m={m}
             prev={msgs[i - 1]}
             currentUserId={currentUserId}
+            otherOnline={presence.online}
             onDelete={() => removeMessage(m.id)}
             onReply={() => setReplyTo(m)}
             onReact={(emoji) => react(m.id, emoji)}
+            onEdit={() => beginEdit(m)}
           />
         ))}
         {presence.typing && (
@@ -611,7 +793,7 @@ function Thread({ conv, currentUserId, onBack }: { conv: ConvDTO; currentUserId:
       )}
 
       {/* yanıt önizleme */}
-      {replyTo && (
+      {replyTo && !editingId && (
         <div className="flex items-center gap-2 border-t border-gray-100 bg-gray-50 px-3 py-2">
           <div className="h-8 w-1 shrink-0 rounded bg-yellow-400" />
           <div className="min-w-0 flex-1">
@@ -622,7 +804,7 @@ function Thread({ conv, currentUserId, onBack }: { conv: ConvDTO; currentUserId:
           </div>
           <button
             onClick={() => setReplyTo(null)}
-            className="shrink-0 rounded-full px-2 py-1 text-gray-400 hover:bg-gray-200"
+            className="shrink-0 rounded-full px-2 py-1 text-black hover:bg-gray-200"
             aria-label="Yanıtı iptal et"
           >
             ✕
@@ -630,8 +812,50 @@ function Thread({ conv, currentUserId, onBack }: { conv: ConvDTO; currentUserId:
         </div>
       )}
 
-      {/* gönder */}
-      <form onSubmit={sendText} className="flex items-center gap-2 border-t border-gray-100 p-3">
+      {/* düzenleme bandı */}
+      {editingId && (
+        <div className="flex items-center gap-2 border-t border-gray-100 bg-blue-50 px-3 py-2">
+          <div className="h-8 w-1 shrink-0 rounded bg-blue-400" />
+          <p className="min-w-0 flex-1 truncate text-xs font-semibold text-blue-700">Mesaj düzenleniyor</p>
+          <button
+            onClick={cancelEdit}
+            className="shrink-0 rounded-full px-2 py-1 text-black hover:bg-gray-200"
+            aria-label="Düzenlemeyi iptal et"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* kayıt göstergesi */}
+      {recording && (
+        <div className="flex items-center gap-3 border-t border-gray-100 bg-red-50 px-3 py-2">
+          <span className="h-3 w-3 animate-pulse rounded-full bg-red-500" />
+          <span className="flex-1 text-sm font-medium text-red-600">
+            Kaydediliyor… {formatCallDuration(recSeconds)}
+          </span>
+          <button
+            type="button"
+            onClick={cancelRecording}
+            className="rounded-full px-3 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-200"
+          >
+            İptal
+          </button>
+          <button
+            type="button"
+            onClick={stopAndSendRecording}
+            className="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+          >
+            Gönder
+          </button>
+        </div>
+      )}
+
+      {/* gönder / düzenle */}
+      <form
+        onSubmit={editingId ? submitEdit : sendText}
+        className="flex items-center gap-1.5 border-t border-gray-100 p-2 sm:gap-2 sm:p-3"
+      >
         <input
           ref={fileRef}
           type="file"
@@ -642,49 +866,107 @@ function Thread({ conv, currentUserId, onBack }: { conv: ConvDTO; currentUserId:
             if (f) sendImage(f);
           }}
         />
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 disabled:opacity-50"
-          aria-label="Fotoğraf ekle"
-          title="Fotoğraf ekle"
-        >
-          {uploading ? (
-            <span className="text-[10px]">…</span>
-          ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <path d="M21 15l-5-5L5 21" />
-            </svg>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowEmoji((s) => !s)}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
-          aria-label="Emoji"
-          title="Emoji"
-        >
-          😊
-        </button>
         <input
-          value={text}
+          ref={docFileRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,application/pdf"
+          className="hidden"
           onChange={(e) => {
-            setText(e.target.value);
-            pingTyping();
+            const f = e.target.files?.[0];
+            if (f) sendDoc(f);
           }}
-          placeholder="Mesaj yaz..."
-          className="flex-1 rounded-full border border-gray-200 px-4 py-2 text-sm outline-none focus:border-yellow-400"
         />
-        <button
-          type="submit"
-          disabled={pending || !text.trim()}
-          className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-        >
-          Gönder
-        </button>
+        {!editingId && (
+          <>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading || recording}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+              aria-label="Fotoğraf ekle"
+              title="Fotoğraf ekle"
+            >
+              {uploading ? (
+                <span className="text-[10px]">…</span>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => docFileRef.current?.click()}
+              disabled={uploadingFile || recording}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+              aria-label="Dosya ekle"
+              title="Dosya ekle"
+            >
+              {uploadingFile ? (
+                <span className="text-[10px]">…</span>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowEmoji((s) => !s)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
+              aria-label="Emoji"
+              title="Emoji"
+            >
+              😊
+            </button>
+          </>
+        )}
+        <input
+          value={editingId ? editText : text}
+          onChange={(e) => {
+            if (editingId) setEditText(e.target.value);
+            else {
+              setText(e.target.value);
+              pingTyping();
+            }
+          }}
+          placeholder={editingId ? "Mesajı düzenle..." : "Mesaj yaz..."}
+          className="min-w-0 flex-1 rounded-full border border-gray-200 px-3 py-2 text-sm outline-none focus:border-yellow-400 sm:px-4"
+        />
+        {editingId ? (
+          <button
+            type="submit"
+            disabled={!editText.trim()}
+            className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            Kaydet
+          </button>
+        ) : text.trim() ? (
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            Gönder
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={recording ? stopAndSendRecording : startRecording}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition ${
+              recording ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"
+            }`}
+            aria-label={recording ? "Kaydı bitir ve gönder" : "Sesli mesaj kaydet"}
+            title={recording ? "Kaydı bitir ve gönder" : "Sesli mesaj kaydet"}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4" />
+            </svg>
+          </button>
+        )}
       </form>
 
       {call && (
@@ -709,6 +991,8 @@ const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 function replyText(r: ReplyPreview): string {
   if (r.deleted) return "Silinen mesaj";
   if (r.kind === "IMAGE") return "📷 Fotoğraf";
+  if (r.kind === "VOICE") return "🎤 Sesli mesaj";
+  if (r.kind === "FILE") return "📎 Dosya";
   return r.content || "Mesaj";
 }
 
@@ -716,16 +1000,20 @@ function MessageBubble({
   m,
   prev,
   currentUserId,
+  otherOnline,
   onDelete,
   onReply,
   onReact,
+  onEdit,
 }: {
   m: MsgDTO;
   prev?: MsgDTO;
   currentUserId: string;
+  otherOnline: boolean;
   onDelete: () => void;
   onReply: () => void;
   onReact: (emoji: string) => void;
+  onEdit: () => void;
 }) {
   const showDay = !prev || dayKey(prev.createdAt) !== dayKey(m.createdAt);
   const [picker, setPicker] = useState(false);
@@ -738,7 +1026,7 @@ function MessageBubble({
           <div className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600">
             <span>{m.callVideo === false ? "📞" : "📹"}</span>
             <span>{callLabel(m)}</span>
-            <span className="text-gray-400">{clockTime(m.createdAt)}</span>
+            <span className="text-black">{clockTime(m.createdAt)}</span>
           </div>
         </div>
       </>
@@ -759,13 +1047,23 @@ function MessageBubble({
       {showDay && <DayDivider date={m.createdAt} />}
       <div className={`group flex items-center gap-1 ${m.mine ? "justify-end" : "justify-start"}`}>
         {/* Aksiyonlar (hover) — kendi mesajım sağda görünür diye sıralama */}
-        {!m.deleted && m.mine && <BubbleActions onReply={onReply} onReact={onReact} onDelete={onDelete} mine picker={picker} setPicker={setPicker} />}
+        {!m.deleted && m.mine && (
+          <BubbleActions
+            onReply={onReply}
+            onReact={onReact}
+            onDelete={onDelete}
+            onEdit={!m.kind || m.kind === "TEXT" ? onEdit : undefined}
+            mine
+            picker={picker}
+            setPicker={setPicker}
+          />
+        )}
 
         <div className="flex flex-col">
           <div
             className={`max-w-[75%] self-start overflow-hidden rounded-2xl text-sm ${m.mine ? "ml-auto" : ""} ${
               m.deleted
-                ? "bg-gray-100 italic text-gray-400"
+                ? "bg-gray-100 italic text-black"
                 : m.mine
                   ? "bg-yellow-400 text-gray-900"
                   : "bg-white text-gray-800 ring-1 ring-gray-100"
@@ -787,13 +1085,17 @@ function MessageBubble({
                 <img src={m.imageUrl} alt="" className="max-h-64 rounded-xl object-cover" />
                 {m.content && <p className="px-2 py-1">{m.content}</p>}
               </a>
+            ) : m.kind === "VOICE" && m.audioUrl ? (
+              <VoicePlayer src={m.audioUrl} duration={m.audioDuration ?? 0} mine={m.mine} />
+            ) : m.kind === "FILE" && m.fileUrl ? (
+              <FileCard url={m.fileUrl} name={m.fileName ?? "Dosya"} size={m.fileSize ?? 0} mine={m.mine} />
             ) : (
               <p className="whitespace-pre-wrap break-words">{m.content}</p>
             )}
             <div className={`flex items-center justify-end gap-1 px-1 pb-0.5 ${m.kind === "IMAGE" ? "pt-1" : ""}`}>
               {m.editedAt && !m.deleted && <span className="text-[10px] opacity-50">düzenlendi</span>}
-              <span className={`text-[10px] ${m.mine ? "text-gray-700/70" : "text-gray-400"}`}>{clockTime(m.createdAt)}</span>
-              {m.mine && !m.deleted && <ReadTicks read={m.isRead} />}
+              <span className={`text-[10px] ${m.mine ? "text-gray-700/70" : "text-black"}`}>{clockTime(m.createdAt)}</span>
+              {m.mine && !m.deleted && <ReadTicks status={tickStatus(m, otherOnline)} />}
             </div>
           </div>
 
@@ -826,6 +1128,7 @@ function BubbleActions({
   onReply,
   onReact,
   onDelete,
+  onEdit,
   mine,
   picker,
   setPicker,
@@ -833,6 +1136,7 @@ function BubbleActions({
   onReply: () => void;
   onReact: (emoji: string) => void;
   onDelete?: () => void;
+  onEdit?: () => void;
   mine?: boolean;
   picker: boolean;
   setPicker: (v: boolean) => void;
@@ -841,7 +1145,7 @@ function BubbleActions({
     <div className="relative flex shrink-0 items-center gap-0.5 self-center opacity-0 transition group-hover:opacity-100">
       <button
         onClick={() => setPicker(!picker)}
-        className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+        className="rounded-full p-1 text-black hover:bg-gray-100 hover:text-gray-700"
         aria-label="Tepki ver"
         title="Tepki ver"
       >
@@ -852,7 +1156,7 @@ function BubbleActions({
       </button>
       <button
         onClick={onReply}
-        className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+        className="rounded-full p-1 text-black hover:bg-gray-100 hover:text-gray-700"
         aria-label="Yanıtla"
         title="Yanıtla"
       >
@@ -861,6 +1165,19 @@ function BubbleActions({
           <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
         </svg>
       </button>
+      {mine && onEdit && (
+        <button
+          onClick={onEdit}
+          className="rounded-full p-1 text-black hover:bg-gray-100 hover:text-blue-600"
+          aria-label="Düzenle"
+          title="Düzenle"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+          </svg>
+        </button>
+      )}
       {mine && onDelete && (
         <button
           onClick={onDelete}
@@ -895,14 +1212,91 @@ function BubbleActions({
   );
 }
 
-function ReadTicks({ read }: { read: boolean }) {
+type TickStatus = "pending" | "sent" | "delivered" | "read";
+
+function tickStatus(m: MsgDTO, otherOnline: boolean): TickStatus {
+  if (m.id.startsWith("tmp-")) return "pending";
+  if (m.isRead) return "read";
+  return otherOnline ? "delivered" : "sent";
+}
+
+function ReadTicks({ status }: { status: TickStatus }) {
+  if (status === "pending") {
+    return (
+      <span className="text-gray-500/70" title="Gönderiliyor">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      </span>
+    );
+  }
+  const read = status === "read";
+  const doubled = status === "read" || status === "delivered";
+  const title = read ? "Okundu" : status === "delivered" ? "İletildi" : "Gönderildi";
   return (
-    <span className={read ? "text-blue-600" : "text-gray-500/70"} title={read ? "Okundu" : "İletildi"}>
+    <span className={read ? "text-blue-600" : "text-gray-500/70"} title={title}>
       <svg width="16" height="11" viewBox="0 0 18 12" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M1 6l3.5 3.5L11 3" />
-        {read && <path d="M7 9.5L13.5 3" />}
+        {doubled && <path d="M7 9.5L13.5 3" />}
       </svg>
     </span>
+  );
+}
+
+function humanFileSize(bytes: number): string {
+  if (!bytes) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let n = bytes;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function VoicePlayer({ src, duration, mine }: { src: string; duration: number; mine: boolean }) {
+  return (
+    <div className="flex items-center gap-2 px-1 py-0.5">
+      <span className={mine ? "text-gray-800" : "text-blue-600"}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+        </svg>
+      </span>
+      <audio src={src} controls preload="metadata" className="h-9 max-w-[220px] sm:max-w-[260px]" />
+      {duration > 0 && (
+        <span className={`shrink-0 text-[10px] ${mine ? "text-gray-700/70" : "text-black"}`}>
+          {formatCallDuration(duration)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function FileCard({ url, name, size, mine }: { url: string; name: string; size: number; mine: boolean }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      download={name}
+      className={`flex max-w-[240px] items-center gap-2 rounded-lg px-2 py-1.5 transition ${
+        mine ? "bg-black/5 hover:bg-black/10" : "bg-gray-50 hover:bg-gray-100"
+      }`}
+    >
+      <span className={`shrink-0 ${mine ? "text-gray-700" : "text-blue-600"}`}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs font-medium">{name}</span>
+        {size > 0 && <span className="block text-[10px] opacity-60">{humanFileSize(size)}</span>}
+      </span>
+    </a>
   );
 }
 

@@ -1,7 +1,8 @@
 import "server-only";
 import prisma from "@/app/lib/prisma";
 import type { ShBookingStatus, ShCurrency } from "@prisma/client";
-import { creditWallet } from "./wallet";
+import { creditWallet, debitWallet } from "./wallet";
+import { refundPayment } from "./payments";
 import { sendMail } from "./lib/mail";
 
 // ===========================================================================
@@ -339,28 +340,66 @@ export async function rejectBooking(bookingId: string, ownerId: string, reason?:
   return { ok: true as const };
 }
 
-/** Kiracı veya ev sahibi iptali → iade. */
+/**
+ * İptal politikası → iade oranı (kira+ücretler için; depozito her zaman tam iade).
+ *   FLEXIBLE: girişe 24+ saat varsa %100, yoksa %0
+ *   MODERATE: girişe 5+ gün varsa %100, 1-5 gün %50, <1 gün %0
+ *   STRICT:   girişe 7+ gün varsa %50, yoksa %0
+ * Ev sahibi iptali/reddi her zaman %100 iade.
+ */
+export function refundRatioForPolicy(policy: string | null | undefined, startDate: Date, now = new Date()): number {
+  const hoursToCheckIn = (startDate.getTime() - now.getTime()) / 3_600_000;
+  const days = hoursToCheckIn / 24;
+  switch ((policy ?? "MODERATE").toUpperCase()) {
+    case "FLEXIBLE":
+      return hoursToCheckIn >= 24 ? 1 : 0;
+    case "STRICT":
+      return days >= 7 ? 0.5 : 0;
+    case "MODERATE":
+    default:
+      if (days >= 5) return 1;
+      if (days >= 1) return 0.5;
+      return 0;
+  }
+}
+
+/** Kiracı veya ev sahibi iptali → iade (kiracı iptalinde politika oranı uygulanır). */
 export async function cancelBooking(bookingId: string, userId: string, reason?: string) {
   const b = await prisma.shRentalBooking.findFirst({
     where: { id: bookingId, OR: [{ renterId: userId }, { ownerId: userId }] },
+    include: { listing: { select: { cancellationPolicy: true } } },
   });
   if (!b) return { ok: false as const, error: "Rezervasyon yok" };
   if (["COMPLETED", "CANCELLED", "REJECTED"].includes(b.status))
     return { ok: false as const, error: "İptal edilemez" };
 
+  const isRenter = userId === b.renterId;
+  // Ev sahibi iptali → tam iade. Kiracı iptali → politikaya göre oran.
+  const ratio = isRenter ? refundRatioForPolicy(b.listing.cancellationPolicy, b.startDate) : 1;
+
   await prisma.shRentalBooking.update({
     where: { id: bookingId },
     data: {
       status: "CANCELLED",
-      cancelReason: reason ?? (userId === b.renterId ? "Kiracı iptali" : "Ev sahibi iptali"),
+      cancelReason: reason ?? (isRenter ? "Kiracı iptali" : "Ev sahibi iptali"),
       cancelledAt: new Date(),
     },
   });
-  // Ödeme alınmışsa iade
-  if (b.paymentId) await refundBooking(b.id);
-  const other = userId === b.renterId ? b.ownerId : b.renterId;
+
+  let refundInfo = { refunded: 0 as number };
+  if (b.paymentId) refundInfo = await refundBooking(b.id, ratio);
+
+  const other = isRenter ? b.ownerId : b.renterId;
   await notifyBooking(other, "Rezervasyon iptal edildi", `${fmtRange(b.startDate, b.endDate)} iptal edildi.`);
-  return { ok: true as const };
+  if (isRenter && b.paymentId) {
+    const pct = Math.round(ratio * 100);
+    await notifyBooking(
+      b.renterId,
+      "İptaliniz alındı",
+      `${b.listing.cancellationPolicy ?? "MODERATE"} politikası: kira tutarının %${pct}'i + depozito iade edildi (${refundInfo.refunded} ${b.currency}).`,
+    );
+  }
+  return { ok: true as const, refunded: refundInfo.refunded };
 }
 
 /** Konaklama tamamlandı: kira ev sahibine, depozito kiracıya. */
@@ -420,32 +459,243 @@ export async function unblockDates(blockId: string, ownerId: string) {
   return { ok: true as const };
 }
 
-// --- yardımcılar ---
+// --- Tarih değişikliği (modification) ---
 
-/** Ödenen tutarı kiracı cüzdanına iade eder + ödeme/ depozito kaydını günceller. */
-async function refundBooking(bookingId: string) {
-  const b = await prisma.shRentalBooking.findUnique({ where: { id: bookingId } });
-  if (!b) return;
-  const payment = b.paymentId ? await prisma.shPayment.findUnique({ where: { id: b.paymentId } }) : null;
-  if (!payment || payment.status !== "PAID") return;
+/** Kiracı veya ev sahibi yeni tarih önerir (diğer taraf onaylar). */
+export async function proposeBookingChange(bookingId: string, userId: string, start: string, end: string) {
+  const b = await prisma.shRentalBooking.findFirst({
+    where: { id: bookingId, OR: [{ renterId: userId }, { ownerId: userId }] },
+  });
+  if (!b) return { ok: false as const, error: "Rezervasyon yok" };
+  if (!["CONFIRMED", "AWAITING_APPROVAL"].includes(b.status))
+    return { ok: false as const, error: "Bu durumda değiştirilemez" };
 
-  await refundToRenter(b.renterId, payment.amount, payment.currency, b.id, payment.provider ?? "wallet");
-  await prisma.shPayment.update({ where: { id: payment.id }, data: { status: "REFUNDED" } });
-  if (b.depositId)
-    await prisma.shDeposit.update({ where: { id: b.depositId }, data: { status: "REFUNDED" } }).catch(() => {});
+  const ns = toUTCDate(start);
+  const ne = toUTCDate(end);
+  if (!(ne.getTime() > ns.getTime())) return { ok: false as const, error: "Geçersiz tarih aralığı" };
+
+  const avail = await isAvailable(b.listingId, ns, ne, b.id);
+  if (!avail) return { ok: false as const, error: "Seçilen tarihler dolu" };
+
+  const q = await quoteBooking(b.listingId, start, end, b.guests);
+  if (!q.ok) return { ok: false as const, error: q.error ?? "Fiyat hesaplanamadı" };
+
+  await prisma.shRentalBooking.update({
+    where: { id: b.id },
+    data: { proposedStartDate: ns, proposedEndDate: ne, proposedById: userId, proposedTotalAmount: q.total },
+  });
+  const other = userId === b.renterId ? b.ownerId : b.renterId;
+  const diff = round2(q.total - b.totalAmount);
+  await notifyBooking(
+    other,
+    "Tarih değişikliği önerildi",
+    `${fmtRange(ns, ne)} — yeni tutar ${q.total} ${b.currency}${diff !== 0 ? ` (fark ${diff > 0 ? "+" : ""}${diff})` : ""}.`,
+  );
+  return { ok: true as const, total: q.total, diff };
 }
 
-async function refundToRenter(renterId: string, amount: number, currency: ShCurrency, bookingId: string, provider: string) {
-  // İade her zaman cüzdana yapılır (hızlı + provider-bağımsız).
-  await creditWallet({
-    userId: renterId,
-    type: "REFUND",
-    amount,
-    currency,
-    description: "Rezervasyon iadesi",
-    refType: "rental-refund",
-    refId: bookingId,
+/** Karşı taraf tarih değişikliğini kabul/ret eder. Fiyat farkı cüzdandan dengelenir. */
+export async function respondBookingChange(bookingId: string, userId: string, accept: boolean) {
+  const b = await prisma.shRentalBooking.findFirst({
+    where: { id: bookingId, OR: [{ renterId: userId }, { ownerId: userId }] },
   });
+  if (!b || !b.proposedStartDate || !b.proposedEndDate || !b.proposedById)
+    return { ok: false as const, error: "Bekleyen öneri yok" };
+  if (b.proposedById === userId) return { ok: false as const, error: "Kendi önerinizi onaylayamazsınız" };
+
+  const clearProposal = {
+    proposedStartDate: null,
+    proposedEndDate: null,
+    proposedById: null,
+    proposedTotalAmount: null,
+  };
+
+  if (!accept) {
+    await prisma.shRentalBooking.update({ where: { id: b.id }, data: clearProposal });
+    await notifyBooking(b.proposedById, "Tarih değişikliği reddedildi", `${fmtRange(b.startDate, b.endDate)} korunuyor.`);
+    return { ok: true as const, accepted: false };
+  }
+
+  // Hâlâ müsait mi?
+  const avail = await isAvailable(b.listingId, b.proposedStartDate, b.proposedEndDate, b.id);
+  if (!avail) {
+    await prisma.shRentalBooking.update({ where: { id: b.id }, data: clearProposal });
+    return { ok: false as const, error: "Tarihler artık müsait değil" };
+  }
+
+  const newTotal = b.proposedTotalAmount ?? b.totalAmount;
+  const diff = round2(newTotal - b.totalAmount);
+
+  // Fiyat farkını dengele: fark > 0 → kiracıdan ek tahsilat; fark < 0 → kiracıya iade.
+  if (diff > 0) {
+    const deb = await debitWallet({
+      userId: b.renterId,
+      amount: diff,
+      currency: b.currency,
+      description: "Rezervasyon tarih değişikliği farkı",
+      refType: "rental-change",
+      refId: `${b.id}:${b.proposedStartDate.toISOString()}`,
+    });
+    if (!deb.ok) return { ok: false as const, error: "Kiracı bakiyesi fark için yetersiz" };
+  } else if (diff < 0) {
+    await creditWallet({
+      userId: b.renterId,
+      type: "REFUND",
+      amount: -diff,
+      currency: b.currency,
+      description: "Rezervasyon tarih değişikliği iadesi",
+      refType: "rental-change-refund",
+      refId: `${b.id}:${b.proposedStartDate.toISOString()}`,
+    });
+  }
+
+  const nights = Math.round((b.proposedEndDate.getTime() - b.proposedStartDate.getTime()) / MS_DAY);
+  await prisma.shRentalBooking.update({
+    where: { id: b.id },
+    data: {
+      startDate: b.proposedStartDate,
+      endDate: b.proposedEndDate,
+      nights,
+      totalAmount: newTotal,
+      ...clearProposal,
+    },
+  });
+  await notifyBooking(b.proposedById, "Tarih değişikliği onaylandı", `Yeni tarihler: ${fmtRange(b.proposedStartDate, b.proposedEndDate)}.`);
+  return { ok: true as const, accepted: true, diff };
+}
+
+// --- Konaklama sonrası değerlendirme ---
+
+/** Kiracı veya ev sahibi tamamlanan rezervasyon sonrası karşı tarafı değerlendirir. */
+export async function submitBookingReview(bookingId: string, authorId: string, rating: number, comment?: string) {
+  const b = await prisma.shRentalBooking.findFirst({
+    where: { id: bookingId, OR: [{ renterId: authorId }, { ownerId: authorId }] },
+  });
+  if (!b) return { ok: false as const, error: "Rezervasyon yok" };
+  if (b.status !== "COMPLETED") return { ok: false as const, error: "Yalnızca tamamlanan rezervasyon değerlendirilebilir" };
+
+  const isRenter = authorId === b.renterId;
+  if (isRenter && b.renterReviewed) return { ok: false as const, error: "Zaten değerlendirdiniz" };
+  if (!isRenter && b.ownerReviewed) return { ok: false as const, error: "Zaten değerlendirdiniz" };
+
+  const targetUserId = isRenter ? b.ownerId : b.renterId;
+  await prisma.shReview.create({
+    data: {
+      authorId,
+      targetUserId,
+      listingId: b.listingId,
+      rating: Math.max(1, Math.min(5, Math.round(rating))),
+      comment: comment?.slice(0, 1000) || null,
+      bookingId: b.id,
+    },
+  });
+  await prisma.shRentalBooking.update({
+    where: { id: b.id },
+    data: isRenter ? { renterReviewed: true } : { ownerReviewed: true },
+  });
+  await notifyBooking(targetUserId, "Yeni değerlendirme", "Rezervasyonunuz için bir değerlendirme bırakıldı.");
+  return { ok: true as const };
+}
+
+// --- iCal dışa aktarma (read-only takvim feed'i) ---
+
+/** Bir ilanın dolu (rezervasyon + blok) tarihlerini iCalendar (.ics) metnine çevirir. */
+export async function buildListingIcal(listingId: string): Promise<string | null> {
+  const listing = await prisma.shListing.findUnique({ where: { id: listingId }, select: { title: true, rentable: true } });
+  if (!listing) return null;
+
+  const [bookings, blocks] = await Promise.all([
+    prisma.shRentalBooking.findMany({
+      where: { listingId, status: { in: BLOCKING } },
+      select: { id: true, startDate: true, endDate: true, updatedAt: true },
+    }),
+    prisma.shRentalBlock.findMany({
+      where: { listingId },
+      select: { id: true, startDate: true, endDate: true, reason: true, createdAt: true },
+    }),
+  ]);
+
+  const fmt = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
+  const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  const lines: string[] = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//sahibinden//rental//TR",
+    "CALSCALE:GREGORIAN",
+    `X-WR-CALNAME:${(listing.title || "Kiralama").replace(/[\r\n,;]/g, " ")}`,
+  ];
+  for (const b of bookings) {
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:booking-${b.id}@sahibinden`,
+      `DTSTAMP:${stamp(b.updatedAt)}`,
+      `DTSTART;VALUE=DATE:${fmt(b.startDate)}`,
+      `DTEND;VALUE=DATE:${fmt(b.endDate)}`,
+      "SUMMARY:Rezervasyon (dolu)",
+      "END:VEVENT",
+    );
+  }
+  for (const bl of blocks) {
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:block-${bl.id}@sahibinden`,
+      `DTSTAMP:${stamp(bl.createdAt)}`,
+      `DTSTART;VALUE=DATE:${fmt(bl.startDate)}`,
+      `DTEND;VALUE=DATE:${fmt(bl.endDate)}`,
+      `SUMMARY:${(bl.reason || "Kapalı").replace(/[\r\n,;]/g, " ")}`,
+      "END:VEVENT",
+    );
+  }
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n");
+}
+
+/** İlan için iCal feed token'ı üretir/getirir (ev sahibi). */
+export async function getOrCreateIcalToken(listingId: string, ownerId: string) {
+  const listing = await prisma.shListing.findFirst({ where: { id: listingId, userId: ownerId }, select: { icalToken: true } });
+  if (!listing) return { ok: false as const, error: "İlan size ait değil" };
+  if (listing.icalToken) return { ok: true as const, token: listing.icalToken };
+  const token = `${listingId.slice(0, 6)}${Math.abs(hashStr(listingId + ownerId)).toString(36)}${Date.now().toString(36)}`;
+  await prisma.shListing.update({ where: { id: listingId }, data: { icalToken: token } });
+  return { ok: true as const, token };
+}
+
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+// --- yardımcılar ---
+
+/**
+ * Ödenen tutarı kiracıya iade eder. `ratio` (0..1) iptal politikasına göre
+ * iade oranıdır (1 = tam iade). İade mümkünse orijinal karta/PayPal'a, değilse
+ * cüzdana yapılır (refundPayment). Depozito her zaman tam iade edilir.
+ */
+async function refundBooking(bookingId: string, ratio = 1) {
+  const b = await prisma.shRentalBooking.findUnique({ where: { id: bookingId } });
+  if (!b) return { refunded: 0 };
+  const payment = b.paymentId ? await prisma.shPayment.findUnique({ where: { id: b.paymentId } }) : null;
+  if (!payment || payment.status !== "PAID") return { refunded: 0 };
+
+  // Depozito her durumda tam iade; kira + ücretler politikaya göre kısmi.
+  const refundableBase = round2(payment.amount - b.deposit);
+  const r = Math.max(0, Math.min(1, ratio));
+  const refundAmount = round2(b.deposit + refundableBase * r);
+
+  const res = await refundPayment(payment.id, {
+    amount: refundAmount,
+    reason: "Rezervasyon iadesi",
+    refundToUserId: b.renterId,
+  });
+  await prisma.shRentalBooking.update({
+    where: { id: b.id },
+    data: { refundedAmount: refundAmount },
+  });
+  if (b.depositId)
+    await prisma.shDeposit.update({ where: { id: b.depositId }, data: { status: "REFUNDED", refundedAt: new Date() } }).catch(() => {});
+  return { refunded: res.ok ? refundAmount : 0, method: res.method };
 }
 
 function fmtRange(s: Date, e: Date) {

@@ -1,5 +1,6 @@
 import { validateRequest } from "@/app/auth";
 import prisma from "@/app/lib/prisma";
+import { confirmStripeSession } from "../../lib/stripe-fulfill";
 import BookingsClient, { type BookingVM } from "../../components/bookings-client";
 import AvailabilityManager, {
   type RentListingVM,
@@ -9,8 +10,9 @@ import AvailabilityManager, {
 
 export const dynamic = "force-dynamic";
 
-function toVM(b: any, side: "renter" | "owner"): BookingVM {
+function toVM(b: any, side: "renter" | "owner", userId: string): BookingVM {
   const other = side === "renter" ? b.owner : b.renter;
+  const alreadyReviewed = side === "renter" ? b.renterReviewed : b.ownerReviewed;
   return {
     id: b.id,
     listingId: b.listingId,
@@ -27,15 +29,31 @@ function toVM(b: any, side: "renter" | "owner"): BookingVM {
     status: b.status,
     note: b.note ?? null,
     contactPhone: b.contactPhone ?? null,
+    proposedStart: b.proposedStartDate ? b.proposedStartDate.toISOString() : null,
+    proposedEnd: b.proposedEndDate ? b.proposedEndDate.toISOString() : null,
+    proposedTotal: b.proposedTotalAmount ?? null,
+    proposedByMe: b.proposedById === userId,
+    canReview: b.status === "COMPLETED" && !alreadyReviewed,
+    // Giriş talimatları yalnızca kiracıya ve onaylı rezervasyonda gösterilir.
+    checkInInstructions:
+      side === "renter" && b.status === "CONFIRMED" ? b.listing?.checkInInstructions ?? null : null,
   };
 }
 
-export default async function RezervasyonlarimPage() {
+export default async function RezervasyonlarimPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ session_id?: string; ok?: string }>;
+}) {
   const { user } = await validateRequest();
   if (!user) return null;
 
+  // Kart dönüşünde rezervasyon ödemesini webhook'tan bağımsız tamamla.
+  const { session_id } = await searchParams;
+  if (session_id) await confirmStripeSession(session_id);
+
   const sel = {
-    listing: { select: { title: true, images: true } },
+    listing: { select: { title: true, images: true, checkInInstructions: true } },
     renter: { select: { displayName: true, name: true, username: true } },
     owner: { select: { displayName: true, name: true, username: true } },
   };
@@ -62,8 +80,8 @@ export default async function RezervasyonlarimPage() {
     }),
   ]);
 
-  const asRenter = renterBookings.map((b) => toVM(b, "renter"));
-  const asOwner = ownerBookings.map((b) => toVM(b, "owner"));
+  const asRenter = renterBookings.map((b) => toVM(b, "renter", user.id));
+  const asOwner = ownerBookings.map((b) => toVM(b, "owner", user.id));
 
   const rentListingVM: RentListingVM[] = rentListings.map((l) => ({ id: l.id, title: l.title }));
   const blockVM: BlockVM[] = rentBlocks.map((b) => ({

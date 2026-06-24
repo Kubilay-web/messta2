@@ -8,13 +8,24 @@ import BillingClient, {
   type ActiveSubVM,
 } from "../../components/billing-client";
 import { walletBalance } from "../../wallet";
+import { confirmStripeSession } from "../../lib/stripe-fulfill";
+import { confirmPaypalSubscriptionReturn } from "../../subscriptions";
 import type { BillingInterval } from "../../lib/billing";
 
 export const dynamic = "force-dynamic";
 
-export default async function AboneliklerPage() {
+export default async function AboneliklerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ session_id?: string; subscription_id?: string; ok?: string }>;
+}) {
   const { user } = await validateRequest();
   if (!user) return null;
+
+  // Kart/PayPal dönüşünde aboneliği webhook'tan bağımsız aktive et.
+  const { session_id, subscription_id } = await searchParams;
+  if (session_id) await confirmStripeSession(session_id);
+  if (subscription_id) await confirmPaypalSubscriptionReturn(subscription_id);
 
   const [plans, stores, listings, subs, balance] = await Promise.all([
     prisma.shPlan.findMany({ where: { active: true }, orderBy: [{ kind: "asc" }, { order: "asc" }] }),

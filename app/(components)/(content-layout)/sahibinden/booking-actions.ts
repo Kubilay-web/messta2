@@ -12,6 +12,10 @@ import {
   completeBooking,
   blockDates,
   unblockDates,
+  proposeBookingChange,
+  respondBookingChange,
+  submitBookingReview,
+  getOrCreateIcalToken,
 } from "./rentals";
 import { debitWallet } from "./wallet";
 
@@ -119,4 +123,34 @@ export async function unblockDatesAction(blockId: string) {
   const res = await unblockDates(blockId, user.id);
   revalidatePath("/sahibinden/hesabim/rezervasyonlarim");
   return res;
+}
+
+export async function proposeBookingChangeAction(bookingId: string, start: string, end: string) {
+  const user = await requireUser();
+  if (!user) return { ok: false as const, error: "Giriş yapın" };
+  const res = await proposeBookingChange(bookingId, user.id, start, end);
+  revalidatePath("/sahibinden/hesabim/rezervasyonlarim");
+  return res;
+}
+
+export async function respondBookingChangeAction(bookingId: string, accept: boolean) {
+  const user = await requireUser();
+  if (!user) return { ok: false as const, error: "Giriş yapın" };
+  const res = await respondBookingChange(bookingId, user.id, accept);
+  revalidatePath("/sahibinden/hesabim/rezervasyonlarim");
+  return res;
+}
+
+export async function submitBookingReviewAction(bookingId: string, rating: number, comment?: string) {
+  const user = await requireUser();
+  if (!user) return { ok: false as const, error: "Giriş yapın" };
+  const res = await submitBookingReview(bookingId, user.id, rating, comment);
+  revalidatePath("/sahibinden/hesabim/rezervasyonlarim");
+  return res;
+}
+
+export async function getIcalTokenAction(listingId: string) {
+  const user = await requireUser();
+  if (!user) return { ok: false as const, error: "Giriş yapın" };
+  return getOrCreateIcalToken(listingId, user.id);
 }

@@ -125,7 +125,7 @@ export default function WalletClient({
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
           <h2 className="mb-3 font-bold text-gray-800">Hesap Hareketleri</h2>
           {txns.length === 0 ? (
-            <p className="py-6 text-center text-sm text-gray-400">Henüz hareket yok.</p>
+            <p className="py-6 text-center text-sm text-black">Henüz hareket yok.</p>
           ) : (
             <div className="divide-y divide-gray-100">
               {txns.map((t) => {
@@ -134,7 +134,7 @@ export default function WalletClient({
                   <div key={t.id} className="flex items-center justify-between py-2.5">
                     <div>
                       <p className="text-sm font-medium text-gray-700">{t.description ?? meta.label}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-black">
                         {new Intl.DateTimeFormat("tr-TR", {
                           day: "numeric",
                           month: "short",
@@ -148,7 +148,7 @@ export default function WalletClient({
                         {t.amount > 0 ? "+" : ""}
                         {fmt(t.amount, t.currency)}
                       </p>
-                      <p className="text-[11px] text-gray-400">{fmt(t.balanceAfter, t.currency)}</p>
+                      <p className="text-[11px] text-black">{fmt(t.balanceAfter, t.currency)}</p>
                     </div>
                   </div>
                 );

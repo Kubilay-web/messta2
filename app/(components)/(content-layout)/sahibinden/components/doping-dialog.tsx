@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { buyDoping } from "../actions";
+import { buyDopingWithWalletAction } from "../deposit-actions";
 import { formatPrice } from "../lib/format";
 
 export interface DopingPackage {
@@ -36,11 +36,11 @@ export default function DopingDialog({
   const [pending, start] = useTransition();
   const router = useRouter();
 
-  function buyInstant() {
+  function payWithWallet() {
     if (!selected) return;
     setError("");
     start(async () => {
-      const res = await buyDoping(listingId, selected);
+      const res = await buyDopingWithWalletAction(listingId, selected);
       if (res.ok) {
         setDone(true);
         setTimeout(() => {
@@ -140,15 +140,15 @@ export default function DopingDialog({
                     PayPal ile Öde
                   </button>
                   <button
-                    onClick={buyInstant}
+                    onClick={payWithWallet}
                     disabled={!selected || pending}
-                    className="w-full rounded-lg border border-gray-200 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                    className="w-full rounded-lg border border-emerald-200 bg-emerald-50 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
                   >
-                    {pending ? "İşleniyor..." : "Hızlı Uygula (Demo — ödemesiz)"}
+                    {pending ? "İşleniyor..." : "👛 Cüzdandan Öde"}
                   </button>
                 </div>
                 <p className="mt-2 text-center text-[11px] text-gray-600">
-                  Stripe & PayPal canlı ödeme; demo seçeneği test içindir.
+                  Stripe & PayPal kartla; cüzdan seçeneği bakiyenizden düşer.
                 </p>
               </>
             )}

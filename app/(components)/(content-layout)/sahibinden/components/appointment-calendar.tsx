@@ -89,7 +89,7 @@ export default function AppointmentCalendar({ appts }: { appts: CalAppt[] }) {
       </div>
 
       {/* Hafta günleri */}
-      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-gray-400">
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-black">
         {WEEKDAYS.map((w) => (
           <div key={w} className="py-1">
             {w}
@@ -125,7 +125,7 @@ export default function AppointmentCalendar({ appts }: { appts: CalAppt[] }) {
                   {dayAppts.slice(0, 3).map((a) => (
                     <span key={a.id} className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[a.status] ?? "bg-gray-400"}`} />
                   ))}
-                  {dayAppts.length > 3 && <span className="text-[8px] text-gray-400">+{dayAppts.length - 3}</span>}
+                  {dayAppts.length > 3 && <span className="text-[8px] text-black">+{dayAppts.length - 3}</span>}
                 </span>
               )}
             </button>
@@ -136,7 +136,7 @@ export default function AppointmentCalendar({ appts }: { appts: CalAppt[] }) {
       {/* Seçili gün listesi */}
       <div className="mt-3 border-t border-gray-100 pt-3">
         {selectedAppts.length === 0 ? (
-          <p className="py-2 text-center text-sm text-gray-400">Bu günde randevu yok.</p>
+          <p className="py-2 text-center text-sm text-black">Bu günde randevu yok.</p>
         ) : (
           <div className="space-y-1.5">
             {selectedAppts
@@ -149,7 +149,7 @@ export default function AppointmentCalendar({ appts }: { appts: CalAppt[] }) {
                   </span>
                   <span>{a.mode === "VIDEO" ? "📹" : "🤝"}</span>
                   <span className="min-w-0 flex-1 truncate text-gray-600">{a.title}</span>
-                  <span className="shrink-0 text-xs text-gray-400">
+                  <span className="shrink-0 text-xs text-black">
                     {a.role === "owner" ? "Gelen" : "Aldığım"} · {a.otherName}
                   </span>
                   <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[a.status] ?? "bg-gray-400"}`} />
@@ -160,7 +160,7 @@ export default function AppointmentCalendar({ appts }: { appts: CalAppt[] }) {
       </div>
 
       {/* Açıklama */}
-      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400">
+      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-black">
         <Legend cls="bg-yellow-400" label="Bekliyor" />
         <Legend cls="bg-green-500" label="Onaylı" />
         <Legend cls="bg-blue-400" label="Tamamlandı" />

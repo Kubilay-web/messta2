@@ -1,7 +1,9 @@
 import { validateRequest } from "@/app/auth";
 import { getOwnerAppointments, getRequesterAppointments } from "../../data";
+import { getAvailability } from "../../appointments";
 import AppointmentRow from "../../components/appointment-row";
 import AppointmentCalendar, { type CalAppt } from "../../components/appointment-calendar";
+import AvailabilityEditor from "../../components/availability-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +11,10 @@ export default async function RandevularPage() {
   const { user } = await validateRequest();
   if (!user) return null;
 
-  const [incoming, outgoing] = await Promise.all([
+  const [incoming, outgoing, availability] = await Promise.all([
     getOwnerAppointments(user.id),
     getRequesterAppointments(user.id),
+    getAvailability(user.id),
   ]);
 
   const calAppts: CalAppt[] = [
@@ -37,6 +40,35 @@ export default async function RandevularPage() {
 
   return (
     <div className="space-y-6">
+      <AvailabilityEditor
+        initial={
+          availability
+            ? {
+                slotMinutes: availability.slotMinutes,
+                leadHours: availability.leadHours,
+                maxDaysAhead: availability.maxDaysAhead,
+                rules: (availability.rules as any) ?? [],
+                blockedDates: (availability.blockedDates as any) ?? [],
+                timezone: availability.timezone,
+                autoConfirmVideo: availability.autoConfirmVideo,
+                autoConfirmFaceToFace: availability.autoConfirmFaceToFace,
+                maxPerDay: availability.maxPerDay,
+              }
+            : null
+        }
+      />
+
+      {calAppts.length > 0 && (
+        <div className="flex justify-end">
+          <a
+            href="/sahibinden/api/appointments/ical"
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+          >
+            📅 Takvime aktar (.ics)
+          </a>
+        </div>
+      )}
+
       {calAppts.length > 0 && <AppointmentCalendar appts={calAppts} />}
 
       <div>

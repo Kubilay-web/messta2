@@ -244,6 +244,58 @@ export async function verifyPaypalWebhook(
   }
 }
 
+/**
+ * PayPal ile (kısmi) iade. `orderId` capture edilmiş bir order kimliğidir.
+ * Önce order'dan capture id bulunur, sonra iade edilir.
+ * TRY USD'ye çevrildiği için iade de aynı oranla yapılır. Başarısızsa null döner.
+ */
+export async function refundPaypal(
+  orderId: string,
+  amountMajor: number,
+  currency: string,
+): Promise<string | null> {
+  try {
+    const token = await getAccessToken();
+    // 1) Order → capture id
+    const orderRes = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${orderId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    const order = await orderRes.json();
+    const captureId = order?.purchase_units?.[0]?.payments?.captures?.[0]?.id as string | undefined;
+    if (!captureId) return null;
+
+    const { payCurrency, value } = payValue(amountMajor, currency);
+    const res = await fetch(`${PAYPAL_BASE}/v2/payments/captures/${captureId}/refund`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: { value, currency_code: payCurrency } }),
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (data?.id && (data.status === "COMPLETED" || data.status === "PENDING")) return data.id as string;
+    return null;
+  } catch (e) {
+    console.warn("[paypal] iade başarısız:", (e as Error)?.message);
+    return null;
+  }
+}
+
+/** Bir PayPal aboneliğinin güncel durumunu döndürür (dönüş sayfası doğrulaması için). */
+export async function getPaypalSubscription(subId: string): Promise<any | null> {
+  try {
+    const token = await getAccessToken();
+    const res = await fetch(`${PAYPAL_BASE}/v1/billing/subscriptions/${subId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 /** PayPal aboneliğini iptal eder. */
 export async function cancelPaypalSubscription(subId: string, reason = "Kullanıcı iptali") {
   const token = await getAccessToken();

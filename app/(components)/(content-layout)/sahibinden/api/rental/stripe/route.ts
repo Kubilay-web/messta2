@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         },
       ],
       metadata: { paymentId: payment.id, bookingId: booking.id, kind: "sahibinden_rental" },
-      success_url: `${BASE}/sahibinden/hesabim/rezervasyonlarim?ok=1`,
+      success_url: `${BASE}/sahibinden/hesabim/rezervasyonlarim?ok=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${BASE}/sahibinden/ilan/${listingId}?iptal=1`,
     });
 

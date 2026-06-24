@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 import { slugify, genListingNo } from "./lib/format";
 import { sendMail, mailNewMessage, mailNewReview, mailListingModeration } from "./lib/mail";
 import { resolveLocationId, getCategoryWithDescendants } from "./data";
+import { buyDopingWithWallet } from "./payments";
 import type { ListingFormInput, ActionResult } from "./lib/types";
 
 async function requireUser() {
@@ -27,6 +28,12 @@ function rentalFields(input: ListingFormInput) {
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
   };
   const rentable = !!input.rentable;
+  const policy = String(input.cancellationPolicy ?? "MODERATE").toUpperCase();
+  const validPolicy = ["FLEXIBLE", "MODERATE", "STRICT"].includes(policy) ? policy : "MODERATE";
+  const clean = (v: unknown) => {
+    const s = typeof v === "string" ? v.trim() : "";
+    return s ? s.slice(0, 2000) : null;
+  };
   return {
     rentable,
     dailyPrice: rentable ? num(input.dailyPrice) : null,
@@ -38,6 +45,9 @@ function rentalFields(input: ListingFormInput) {
     maxNights: rentable ? int(input.maxNights) : null,
     maxGuests: rentable ? int(input.maxGuests) : null,
     instantBook: rentable ? !!input.instantBook : false,
+    cancellationPolicy: rentable ? validPolicy : "MODERATE",
+    houseRules: rentable ? clean(input.houseRules) : null,
+    checkInInstructions: rentable ? clean(input.checkInInstructions) : null,
   };
 }
 
@@ -383,8 +393,13 @@ async function deliverMessage(opts: {
   sellerId: string;
   content: string;
   listingTitle?: string;
-  kind?: "TEXT" | "IMAGE" | "CALL";
+  kind?: "TEXT" | "IMAGE" | "CALL" | "VOICE" | "FILE";
   imageUrl?: string | null;
+  audioUrl?: string | null;
+  audioDuration?: number | null;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
   callOutcome?: string | null;
   callDuration?: number | null;
   callVideo?: boolean;
@@ -413,6 +428,11 @@ async function deliverMessage(opts: {
       content: opts.content.trim(),
       kind,
       imageUrl: opts.imageUrl ?? null,
+      audioUrl: opts.audioUrl ?? null,
+      audioDuration: opts.audioDuration ?? null,
+      fileUrl: opts.fileUrl ?? null,
+      fileName: opts.fileName ?? null,
+      fileSize: opts.fileSize ?? null,
       callOutcome: opts.callOutcome ?? null,
       callDuration: opts.callDuration ?? null,
       callVideo: opts.callVideo ?? true,
@@ -424,11 +444,15 @@ async function deliverMessage(opts: {
   const preview =
     kind === "IMAGE"
       ? "📷 Fotoğraf"
-      : kind === "CALL"
-        ? opts.callVideo === false
-          ? "📞 Sesli arama"
-          : "📹 Görüntülü arama"
-        : opts.content.trim();
+      : kind === "VOICE"
+        ? "🎤 Sesli mesaj"
+        : kind === "FILE"
+          ? `📎 ${opts.fileName ?? "Dosya"}`
+          : kind === "CALL"
+            ? opts.callVideo === false
+              ? "📞 Sesli arama"
+              : "📹 Görüntülü arama"
+            : opts.content.trim();
 
   await prisma.shConversation.update({
     where: { id: conv.id },
@@ -630,6 +654,105 @@ export async function replyImageMessage(
   return { ok: true };
 }
 
+/** Sesli mesaj gönderir (Cloudinary ses URL'i client'tan gelir). */
+export async function sendVoiceMessage(
+  listingId: string,
+  receiverId: string,
+  audioUrl: string,
+  audioDuration: number,
+  replyToId?: string,
+): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  if (!audioUrl?.trim()) return { ok: false, error: "Ses kaydı bulunamadı." };
+
+  const listing = await prisma.shListing.findUnique({
+    where: { id: listingId },
+    select: { userId: true, title: true },
+  });
+  if (!listing) return { ok: false, error: "İlan bulunamadı." };
+  if (await isBlockedBetween(user.id, receiverId))
+    return { ok: false, error: "Bu kullanıcıyla mesajlaşamazsınız." };
+
+  await deliverMessage({
+    listingId,
+    senderId: user.id,
+    receiverId,
+    sellerId: listing.userId,
+    content: "",
+    listingTitle: listing.title,
+    kind: "VOICE",
+    audioUrl: audioUrl.trim(),
+    audioDuration: Math.max(0, Math.round(audioDuration)),
+    replyToId: replyToId ?? null,
+  });
+
+  revalidatePath("/sahibinden/hesabim/mesajlarim");
+  return { ok: true };
+}
+
+/** Dosya/belge mesajı gönderir (Cloudinary dosya URL'i client'tan gelir). */
+export async function sendFileMessage(
+  listingId: string,
+  receiverId: string,
+  fileUrl: string,
+  fileName: string,
+  fileSize: number,
+  replyToId?: string,
+): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  if (!fileUrl?.trim()) return { ok: false, error: "Dosya bulunamadı." };
+
+  const listing = await prisma.shListing.findUnique({
+    where: { id: listingId },
+    select: { userId: true, title: true },
+  });
+  if (!listing) return { ok: false, error: "İlan bulunamadı." };
+  if (await isBlockedBetween(user.id, receiverId))
+    return { ok: false, error: "Bu kullanıcıyla mesajlaşamazsınız." };
+
+  await deliverMessage({
+    listingId,
+    senderId: user.id,
+    receiverId,
+    sellerId: listing.userId,
+    content: "",
+    listingTitle: listing.title,
+    kind: "FILE",
+    fileUrl: fileUrl.trim(),
+    fileName: (fileName || "Dosya").slice(0, 200),
+    fileSize: Math.max(0, Math.round(fileSize)),
+    replyToId: replyToId ?? null,
+  });
+
+  revalidatePath("/sahibinden/hesabim/mesajlarim");
+  return { ok: true };
+}
+
+/** Bir metin mesajını (yalnızca gönderen) düzenler. */
+export async function editMessage(messageId: string, content: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  if (!content?.trim()) return { ok: false, error: "Mesaj boş olamaz." };
+
+  const msg = await prisma.shMessage.findUnique({
+    where: { id: messageId },
+    select: { senderId: true, kind: true, deletedAt: true },
+  });
+  if (!msg) return { ok: false, error: "Mesaj bulunamadı." };
+  if (msg.senderId !== user.id) return { ok: false, error: "Yalnızca kendi mesajınızı düzenleyebilirsiniz." };
+  if (msg.deletedAt) return { ok: false, error: "Silinmiş mesaj düzenlenemez." };
+  if (msg.kind !== "TEXT") return { ok: false, error: "Yalnızca metin mesajları düzenlenebilir." };
+
+  await prisma.shMessage.update({
+    where: { id: messageId },
+    data: { content: content.trim(), editedAt: new Date() },
+  });
+  revalidatePath("/sahibinden/hesabim/mesajlarim");
+  return { ok: true };
+}
+
 /** Bir mesajı (yalnızca gönderen) yumuşak siler. */
 export async function deleteMessage(messageId: string): Promise<ActionResult> {
   const user = await requireUser();
@@ -767,66 +890,15 @@ export async function recordRecentView(listingId: string) {
 //  Doping (ücretli öne çıkarma)
 // ---------------------------------------------------------------------------
 
+/**
+ * Geriye-uyum: doping satın alımı artık ücretsiz (demo) değil — cüzdandan
+ * gerçek tahsilat yapar. Kartla ödeme için /api/doping/{stripe|paypal} kullanılır.
+ */
 export async function buyDoping(listingId: string, packageId: string): Promise<ActionResult> {
   const user = await requireUser();
   if (!user) return { ok: false, error: "Giriş yapın." };
-
-  const [listing, pkg] = await Promise.all([
-    prisma.shListing.findUnique({ where: { id: listingId } }),
-    prisma.shDopingPackage.findUnique({ where: { id: packageId } }),
-  ]);
-  if (!listing) return { ok: false, error: "İlan bulunamadı." };
-  if (listing.userId !== user.id) return { ok: false, error: "Yetkiniz yok." };
-  if (!pkg || !pkg.active) return { ok: false, error: "Paket bulunamadı." };
-
-  const expiresAt = new Date(Date.now() + pkg.durationDays * 86400000);
-
-  // Ödeme kaydı (demo: doğrudan PAID — gerçekte iyzico/stripe entegre edilir)
-  const payment = await prisma.shPayment.create({
-    data: {
-      userId: user.id,
-      amount: pkg.price,
-      currency: pkg.currency,
-      type: "DOPING",
-      status: "PAID",
-      provider: "demo",
-      meta: { packageId: pkg.id, listingId },
-    },
-  });
-
-  await prisma.shListingDoping.create({
-    data: {
-      listingId,
-      packageId,
-      userId: user.id,
-      paymentId: payment.id,
-      status: "ACTIVE",
-      expiresAt,
-    },
-  });
-
-  const flagData: Record<string, unknown> = {};
-  switch (pkg.type) {
-    case "SHOWCASE":
-      flagData.isShowcase = true;
-      flagData.showcaseUntil = expiresAt;
-      break;
-    case "FEATURED":
-      flagData.isFeatured = true;
-      flagData.featuredUntil = expiresAt;
-      break;
-    case "URGENT":
-      flagData.isUrgent = true;
-      flagData.urgentUntil = expiresAt;
-      break;
-    case "BUMP":
-      flagData.bumpedAt = new Date();
-      break;
-    default:
-      break;
-  }
-  await prisma.shListing.update({ where: { id: listingId }, data: flagData });
-
+  const res = await buyDopingWithWallet(user.id, listingId, packageId);
+  if (!res.ok) return { ok: false, error: res.error };
   revalidatePath(`/sahibinden/ilan/${listingId}`);
   revalidatePath("/sahibinden/hesabim/ilanlarim");
   revalidatePath("/sahibinden");
@@ -1009,6 +1081,7 @@ export async function requestViewing(params: {
   phone?: string;
   mode?: "FACE_TO_FACE" | "VIDEO";
   durationMin?: number;
+  alternativeSlots?: string[]; // kiracının önerdiği yedek saatler (ISO)
 }): Promise<ActionResult> {
   const user = await requireUser();
   if (!user) return { ok: false, error: "Randevu için giriş yapın." };
@@ -1025,6 +1098,34 @@ export async function requestViewing(params: {
 
   const mode = params.mode === "VIDEO" ? "VIDEO" : "FACE_TO_FACE";
   const durationMin = params.durationMin && params.durationMin > 0 ? Math.round(params.durationMin) : 30;
+
+  // Yedek/alternatif saatler (en çok 3, gelecekte olanlar)
+  const altSlots = (Array.isArray(params.alternativeSlots) ? params.alternativeSlots : [])
+    .filter((s) => {
+      const t = new Date(s).getTime();
+      return Number.isFinite(t) && t > Date.now() && s !== params.scheduledAt;
+    })
+    .slice(0, 3);
+
+  // Ev sahibinin müsaitlik ayarları → otomatik onay + günlük kota
+  const av = await prisma.shAvailability.findUnique({
+    where: { userId: listing.userId },
+    select: { autoConfirmVideo: true, autoConfirmFaceToFace: true, maxPerDay: true, timezone: true },
+  });
+  const tz = av?.timezone || "Europe/Istanbul";
+
+  // Günlük kota kontrolü (ev sahibinin yerel gününe göre)
+  if (av && av.maxPerDay && av.maxPerDay > 0) {
+    const { localDayBoundsUtc } = await import("./appointments");
+    const { start, end } = localDayBoundsUtc(tz, new Date(params.scheduledAt));
+    const dayCount = await prisma.shViewingAppointment.count({
+      where: { ownerId: listing.userId, status: { in: ["PENDING", "CONFIRMED"] }, scheduledAt: { gte: start, lt: end } },
+    });
+    if (dayCount >= av.maxPerDay) return { ok: false, error: "Bu gün için randevu kotası dolu. Lütfen başka bir gün seçin." };
+  }
+
+  const autoConfirm = mode === "VIDEO" ? !!av?.autoConfirmVideo : !!av?.autoConfirmFaceToFace;
+  const initialStatus = autoConfirm ? "CONFIRMED" : "PENDING";
 
   // Çakışma kontrolü: aynı ev sahibi VEYA aynı kiracı için zaman aralığı çakışması
   const newStart = new Date(params.scheduledAt).getTime();
@@ -1064,6 +1165,8 @@ export async function requestViewing(params: {
       mode,
       note: params.note || null,
       phone: params.phone || null,
+      status: initialStatus as any,
+      alternativeSlots: altSlots.length > 0 ? altSlots : undefined,
     },
   });
 
@@ -1072,8 +1175,15 @@ export async function requestViewing(params: {
       data: {
         userId: listing.userId,
         type: "NEW_MESSAGE",
-        title: mode === "VIDEO" ? "Yeni görüntülü görüşme talebi" : "Yeni gezme randevusu talebi",
-        body: `${listing.title} için ${mode === "VIDEO" ? "görüntülü görüşme" : "gezme"} randevu talebi`,
+        title:
+          initialStatus === "CONFIRMED"
+            ? mode === "VIDEO"
+              ? "Görüntülü görüşme onaylandı"
+              : "Gezme randevusu onaylandı"
+            : mode === "VIDEO"
+              ? "Yeni görüntülü görüşme talebi"
+              : "Yeni gezme randevusu talebi",
+        body: `${listing.title} için ${mode === "VIDEO" ? "görüntülü görüşme" : "gezme"} randevu${initialStatus === "CONFIRMED" ? "su (otomatik onaylandı)" : " talebi"}`,
         link: "/sahibinden/hesabim/randevular",
         listingId: params.listingId,
       },
@@ -1097,7 +1207,11 @@ export async function requestViewing(params: {
   return { ok: true };
 }
 
-export async function setAppointmentStatus(id: string, status: string): Promise<ActionResult> {
+export async function setAppointmentStatus(
+  id: string,
+  status: string,
+  selectedSlotIso?: string,
+): Promise<ActionResult> {
   const user = await requireUser();
   if (!user) return { ok: false, error: "Giriş yapın." };
   const appt = await prisma.shViewingAppointment.findUnique({ where: { id } });
@@ -1107,7 +1221,18 @@ export async function setAppointmentStatus(id: string, status: string): Promise<
   const isRequester = appt.requesterId === user.id;
   if (!isOwner && !isRequester) return { ok: false, error: "Yetkiniz yok." };
 
-  await prisma.shViewingAppointment.update({ where: { id }, data: { status: status as any } });
+  // Ev sahibi onaylarken kiracının önerdiği alternatif saatlerden birini seçebilir.
+  let scheduledAt = appt.scheduledAt;
+  if (isOwner && status === "CONFIRMED" && selectedSlotIso) {
+    const alts: string[] = Array.isArray(appt.alternativeSlots) ? (appt.alternativeSlots as any) : [];
+    const valid = [appt.scheduledAt.toISOString(), ...alts];
+    if (valid.includes(selectedSlotIso)) scheduledAt = new Date(selectedSlotIso);
+  }
+
+  await prisma.shViewingAppointment.update({
+    where: { id },
+    data: { status: status as any, scheduledAt, ...(status === "CONFIRMED" ? { reminderSentAt: null } : {}) },
+  });
 
   const notifyUserId = isOwner ? appt.requesterId : appt.ownerId;
   const labels: Record<string, string> = {
@@ -1153,6 +1278,195 @@ export async function markAppointmentCall(id: string, phase: "start" | "end"): P
       data: { callEndedAt: new Date(), status: appt.status === "CONFIRMED" ? "COMPLETED" : appt.status },
     });
   }
+  return { ok: true };
+}
+
+/** Tamamlanan randevu sonrası karşı tarafı değerlendir (1-5). */
+export async function submitAppointmentReview(id: string, rating: number, comment?: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  const appt = await prisma.shViewingAppointment.findUnique({ where: { id } });
+  if (!appt) return { ok: false, error: "Randevu bulunamadı." };
+  if (appt.status !== "COMPLETED") return { ok: false, error: "Yalnızca tamamlanan randevu değerlendirilebilir." };
+  const isRequester = appt.requesterId === user.id;
+  const isOwner = appt.ownerId === user.id;
+  if (!isRequester && !isOwner) return { ok: false, error: "Yetkiniz yok." };
+  if (isRequester && appt.ratingByRequester != null) return { ok: false, error: "Zaten değerlendirdiniz." };
+  if (isOwner && appt.ratingByOwner != null) return { ok: false, error: "Zaten değerlendirdiniz." };
+
+  const r = Math.max(1, Math.min(5, Math.round(rating)));
+  const text = comment?.slice(0, 1000) || null;
+  const targetUserId = isRequester ? appt.ownerId : appt.requesterId;
+
+  await prisma.shViewingAppointment.update({
+    where: { id },
+    data: isRequester
+      ? { ratingByRequester: r, reviewByRequester: text }
+      : { ratingByOwner: r, reviewByOwner: text },
+  });
+  await prisma.shReview.create({
+    data: { authorId: user.id, targetUserId, listingId: appt.listingId, rating: r, comment: text, appointmentId: appt.id },
+  });
+  await prisma.shNotification
+    .create({
+      data: {
+        userId: targetUserId,
+        type: "NEW_MESSAGE",
+        title: "Randevu değerlendirmesi",
+        body: "Randevunuz için bir değerlendirme bırakıldı.",
+        link: "/sahibinden/hesabim/randevular",
+        listingId: appt.listingId,
+      },
+    })
+    .catch(() => {});
+
+  revalidatePath("/sahibinden/hesabim/randevular");
+  return { ok: true };
+}
+
+/** İlan sahibi haftalık randevu müsaitliğini kaydeder (Calendly tarzı). */
+export async function saveAvailability(input: {
+  slotMinutes: number;
+  leadHours: number;
+  maxDaysAhead: number;
+  rules: { day: number; start: string; end: string }[];
+  blockedDates: string[];
+  timezone?: string;
+  autoConfirmVideo?: boolean;
+  autoConfirmFaceToFace?: boolean;
+  maxPerDay?: number;
+}): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+
+  const hhmm = /^\d{1,2}:\d{2}$/;
+  const rules = (Array.isArray(input.rules) ? input.rules : [])
+    .filter(
+      (r) =>
+        Number.isInteger(r.day) &&
+        r.day >= 0 &&
+        r.day <= 6 &&
+        hhmm.test(r.start) &&
+        hhmm.test(r.end) &&
+        r.start < r.end,
+    )
+    .map((r) => ({ day: r.day, start: r.start, end: r.end }));
+
+  const blockedDates = (Array.isArray(input.blockedDates) ? input.blockedDates : [])
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .slice(0, 366);
+
+  const slotMinutes = Math.min(240, Math.max(10, Math.round(input.slotMinutes || 30)));
+  const leadHours = Math.min(168, Math.max(0, Math.round(input.leadHours ?? 2)));
+  const maxDaysAhead = Math.min(60, Math.max(1, Math.round(input.maxDaysAhead || 30)));
+  const maxPerDay = Math.min(50, Math.max(0, Math.round(input.maxPerDay ?? 0)));
+  const autoConfirmVideo = !!input.autoConfirmVideo;
+  const autoConfirmFaceToFace = !!input.autoConfirmFaceToFace;
+  // Geçerli IANA tz mi? değilse Istanbul.
+  let timezone = "Europe/Istanbul";
+  if (input.timezone) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: input.timezone });
+      timezone = input.timezone;
+    } catch {
+      /* geçersiz → varsayılan */
+    }
+  }
+
+  const common = { slotMinutes, leadHours, maxDaysAhead, rules, blockedDates, maxPerDay, autoConfirmVideo, autoConfirmFaceToFace, timezone };
+  await prisma.shAvailability.upsert({
+    where: { userId: user.id },
+    create: { userId: user.id, ...common },
+    update: common,
+  });
+
+  revalidatePath("/sahibinden/hesabim/randevular");
+  return { ok: true };
+}
+
+/** Bir taraf yeni randevu saati önerir (karşı-teklif). */
+export async function proposeReschedule(id: string, newISO: string): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  if (!newISO) return { ok: false, error: "Yeni saat seçiniz." };
+  const when = new Date(newISO);
+  if (isNaN(when.getTime())) return { ok: false, error: "Geçersiz saat." };
+  if (when.getTime() < Date.now() - 60_000) return { ok: false, error: "Geçmiş bir zaman seçilemez." };
+
+  const appt = await prisma.shViewingAppointment.findUnique({ where: { id } });
+  if (!appt) return { ok: false, error: "Randevu bulunamadı." };
+  if (appt.ownerId !== user.id && appt.requesterId !== user.id)
+    return { ok: false, error: "Yetkiniz yok." };
+  if (appt.status === "CANCELLED" || appt.status === "REJECTED" || appt.status === "COMPLETED")
+    return { ok: false, error: "Bu randevu güncellenemez." };
+
+  await prisma.shViewingAppointment.update({
+    where: { id },
+    data: { proposedAt: when, proposedById: user.id },
+  });
+
+  const notifyUserId = appt.ownerId === user.id ? appt.requesterId : appt.ownerId;
+  await prisma.shNotification
+    .create({
+      data: {
+        userId: notifyUserId,
+        type: "NEW_MESSAGE",
+        title: "Yeni randevu saati önerildi",
+        body: when.toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" }),
+        link: "/sahibinden/hesabim/randevular",
+        listingId: appt.listingId,
+      },
+    })
+    .catch(() => {});
+
+  revalidatePath("/sahibinden/hesabim/randevular");
+  return { ok: true };
+}
+
+/** Önerilen yeni saati kabul/ret eder (öneren değil, karşı taraf çağırır). */
+export async function respondReschedule(id: string, accept: boolean): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!user) return { ok: false, error: "Giriş yapın." };
+  const appt = await prisma.shViewingAppointment.findUnique({ where: { id } });
+  if (!appt) return { ok: false, error: "Randevu bulunamadı." };
+  if (!appt.proposedAt) return { ok: false, error: "Bekleyen bir öneri yok." };
+  if (appt.ownerId !== user.id && appt.requesterId !== user.id)
+    return { ok: false, error: "Yetkiniz yok." };
+  if (appt.proposedById === user.id)
+    return { ok: false, error: "Kendi önerinizi yanıtlayamazsınız." };
+
+  if (accept) {
+    await prisma.shViewingAppointment.update({
+      where: { id },
+      data: {
+        scheduledAt: appt.proposedAt,
+        proposedAt: null,
+        proposedById: null,
+        reminderSentAt: null,
+        status: "CONFIRMED",
+      },
+    });
+  } else {
+    await prisma.shViewingAppointment.update({
+      where: { id },
+      data: { proposedAt: null, proposedById: null },
+    });
+  }
+
+  await prisma.shNotification
+    .create({
+      data: {
+        userId: appt.proposedById,
+        type: "NEW_MESSAGE",
+        title: accept ? "Yeni saat kabul edildi" : "Yeni saat reddedildi",
+        body: "",
+        link: "/sahibinden/hesabim/randevular",
+        listingId: appt.listingId,
+      },
+    })
+    .catch(() => {});
+
+  revalidatePath("/sahibinden/hesabim/randevular");
   return { ok: true };
 }
 

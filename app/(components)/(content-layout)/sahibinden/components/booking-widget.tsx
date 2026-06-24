@@ -3,6 +3,13 @@
 import { useState, useEffect, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { bookWithWallet } from "../booking-actions";
+import RentalCalendar from "./rental-calendar";
+
+const POLICY_LABEL: Record<string, string> = {
+  FLEXIBLE: "Esnek iptal — girişe 24 saat kalaya kadar tam iade",
+  MODERATE: "Orta iptal — girişe 5 gün kala tam, 1-5 gün arası %50 iade",
+  STRICT: "Katı iptal — girişe 7+ gün kala %50, sonrası iadesiz",
+};
 
 interface Quote {
   ok: boolean;
@@ -38,6 +45,8 @@ export default function BookingWidget({
   isOwner,
   walletBalance,
   paypalEnabled,
+  cancellationPolicy = "MODERATE",
+  houseRules,
 }: {
   listingId: string;
   dailyPrice: number;
@@ -50,6 +59,8 @@ export default function BookingWidget({
   isOwner: boolean;
   walletBalance: number;
   paypalEnabled: boolean;
+  cancellationPolicy?: string;
+  houseRules?: string | null;
 }) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -132,6 +143,18 @@ export default function BookingWidget({
         ) : null}
       </div>
 
+      <div className="mb-2">
+        <RentalCalendar
+          listingId={listingId}
+          start={start}
+          end={end}
+          onChange={(s, e) => {
+            setStart(s);
+            setEnd(e);
+          }}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <span className="text-xs font-medium text-gray-500">Giriş</span>
@@ -167,10 +190,10 @@ export default function BookingWidget({
         />
       </label>
 
-      {minNights ? <p className="mt-1 text-xs text-gray-400">En az {minNights} gece</p> : null}
+      {minNights ? <p className="mt-1 text-xs text-black">En az {minNights} gece</p> : null}
 
       {/* Fiyat dökümü */}
-      {loadingQuote && <p className="mt-3 text-sm text-gray-400">Fiyat hesaplanıyor…</p>}
+      {loadingQuote && <p className="mt-3 text-sm text-black">Fiyat hesaplanıyor…</p>}
       {quote && !quote.ok && quote.error && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{quote.error}</p>
       )}
@@ -259,10 +282,21 @@ export default function BookingWidget({
                 {pending ? "…" : "Cüzdan"}
               </button>
             </div>
-            <p className="text-center text-[11px] text-gray-400">
+            <p className="text-center text-[11px] text-black">
               {instantBook ? "Anında onaylanır." : "Önce ev sahibi onaylar, onaylanmazsa iade edilir."}
             </p>
           </>
+        )}
+      </div>
+
+      {/* İptal politikası + ev kuralları */}
+      <div className="mt-3 space-y-2 border-t border-gray-100 pt-3 text-xs text-gray-500">
+        <p>🛡️ {POLICY_LABEL[(cancellationPolicy ?? "MODERATE").toUpperCase()] ?? POLICY_LABEL.MODERATE}</p>
+        {houseRules && (
+          <details>
+            <summary className="cursor-pointer font-medium text-gray-600">Ev kuralları</summary>
+            <p className="mt-1 whitespace-pre-line text-gray-500">{houseRules}</p>
+          </details>
         )}
       </div>
     </div>
@@ -271,7 +305,7 @@ export default function BookingWidget({
 
 function Row({ label, value, green, muted }: { label: string; value: string; green?: boolean; muted?: boolean }) {
   return (
-    <div className={`flex justify-between ${muted ? "text-gray-400" : "text-gray-600"}`}>
+    <div className={`flex justify-between ${muted ? "text-black" : "text-gray-600"}`}>
       <span>{label}</span>
       <span className={green ? "text-green-600" : ""}>{value}</span>
     </div>

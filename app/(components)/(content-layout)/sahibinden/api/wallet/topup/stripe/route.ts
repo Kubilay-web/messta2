@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         },
       ],
       metadata: { paymentId: payment.id, kind: "sahibinden_wallet_topup" },
-      success_url: `${BASE}/sahibinden/hesabim/cuzdan?ok=1`,
+      success_url: `${BASE}/sahibinden/hesabim/cuzdan?ok=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${BASE}/sahibinden/hesabim/cuzdan?iptal=1`,
     });
 

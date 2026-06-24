@@ -64,6 +64,9 @@ export default async function EditListingPage({ params }: { params: Promise<{ id
           maxNights: listing.maxNights,
           maxGuests: listing.maxGuests,
           instantBook: listing.instantBook,
+          cancellationPolicy: listing.cancellationPolicy,
+          houseRules: listing.houseRules,
+          checkInInstructions: listing.checkInInstructions,
         }}
       />
     </div>

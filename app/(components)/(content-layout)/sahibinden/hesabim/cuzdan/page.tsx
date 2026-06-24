@@ -1,12 +1,21 @@
 import { validateRequest } from "@/app/auth";
 import { getOrCreateWallet, listWalletTxns } from "../../wallet";
+import { confirmStripeSession } from "../../lib/stripe-fulfill";
 import WalletClient, { type TxnVM } from "../../components/wallet-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function CuzdanPage() {
+export default async function CuzdanPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ session_id?: string; ok?: string }>;
+}) {
   const { user } = await validateRequest();
   if (!user) return null;
+
+  // Kart dönüşünde webhook'tan bağımsız doğrulama: ödeme tamamlandıysa bakiye yüklenir.
+  const { session_id } = await searchParams;
+  if (session_id) await confirmStripeSession(session_id);
 
   const wallet = await getOrCreateWallet(user.id);
   const txns = await listWalletTxns(user.id, 50);

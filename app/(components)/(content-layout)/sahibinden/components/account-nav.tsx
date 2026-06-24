@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/sahibinden/hesabim/randevular", label: "Randevular" },
   { href: "/sahibinden/hesabim/mesajlarim", label: "Mesajlarım" },
   { href: "/sahibinden/hesabim/rezervasyonlarim", label: "Rezervasyonlarım" },
+  { href: "/sahibinden/hesabim/kaporalar", label: "Kaporalar" },
   { href: "/sahibinden/hesabim/abonelikler", label: "Abonelikler & Planlar" },
   { href: "/sahibinden/hesabim/cuzdan", label: "Cüzdanım" },
   { href: "/sahibinden/hesabim/bildirimler", label: "Bildirimler" },

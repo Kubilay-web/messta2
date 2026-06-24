@@ -93,6 +93,9 @@ export default function ListingForm({
   const [maxNights, setMaxNights] = useState(initial?.maxNights ? String(initial.maxNights) : "");
   const [maxGuests, setMaxGuests] = useState(initial?.maxGuests ? String(initial.maxGuests) : "");
   const [instantBook, setInstantBook] = useState(initial?.instantBook ?? false);
+  const [cancellationPolicy, setCancellationPolicy] = useState(initial?.cancellationPolicy ?? "MODERATE");
+  const [houseRules, setHouseRules] = useState(initial?.houseRules ?? "");
+  const [checkInInstructions, setCheckInInstructions] = useState(initial?.checkInInstructions ?? "");
 
   const [uploading, setUploading] = useState(false);
 
@@ -207,6 +210,9 @@ export default function ListingForm({
       maxNights: maxNights ? Number(maxNights) : null,
       maxGuests: maxGuests ? Number(maxGuests) : null,
       instantBook,
+      cancellationPolicy,
+      houseRules: houseRules || null,
+      checkInInstructions: checkInInstructions || null,
     };
 
     start(async () => {
@@ -579,6 +585,35 @@ export default function ListingForm({
               onChange={setInstantBook}
               label="Anında rezervasyon (onaysız — ödeme sonrası otomatik onaylanır)"
             />
+            <Field label="İptal politikası">
+              <select
+                value={cancellationPolicy}
+                onChange={(e) => setCancellationPolicy(e.target.value)}
+                className={inputCls}
+              >
+                <option value="FLEXIBLE">Esnek — girişe 24 saat kalaya kadar tam iade</option>
+                <option value="MODERATE">Orta — girişe 5 gün kala tam, 1-5 gün arası %50</option>
+                <option value="STRICT">Katı — girişe 7+ gün kala %50, sonrası iadesiz</option>
+              </select>
+            </Field>
+            <Field label="Ev kuralları (opsiyonel)">
+              <textarea
+                value={houseRules}
+                onChange={(e) => setHouseRules(e.target.value)}
+                rows={3}
+                placeholder="Sigara içilmez, evcil hayvan kabul edilmez, sessiz saatler 23:00-08:00 vb."
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Giriş talimatları (yalnızca onaylı kiracıya gösterilir)">
+              <textarea
+                value={checkInInstructions}
+                onChange={(e) => setCheckInInstructions(e.target.value)}
+                rows={3}
+                placeholder="Anahtar kutusu şifresi, kapı kodu, giriş yönergeleri vb."
+                className={inputCls}
+              />
+            </Field>
           </div>
         )}
       </Card>

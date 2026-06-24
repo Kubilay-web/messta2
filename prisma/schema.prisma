@@ -5939,6 +5939,12 @@ model ShListing {
   checkOutTime String? // "11:00"
   instantBook  Boolean @default(false) // Onaysız anında rezervasyon
 
+  // İptal politikası: FLEXIBLE | MODERATE | STRICT (iade oranını belirler)
+  cancellationPolicy  String  @default("MODERATE")
+  houseRules          String? // Ev kuralları (sigara/evcil hayvan/parti vb.)
+  checkInInstructions String? // Giriş talimatları / anahtar / şifre (onaylı kiracıya gösterilir)
+  icalToken           String? // Kiralama takvimi dışa aktarma feed'i (uygulama içinde benzersiz üretilir; çoklu null sorunu için @unique kullanılmaz)
+
   viewCount     Int @default(0)
   favoriteCount Int @default(0)
   messageCount  Int @default(0)
@@ -6002,6 +6008,8 @@ enum ShMessageKind {
   TEXT
   IMAGE
   CALL // görüntülü/sesli arama kaydı
+  VOICE // sesli mesaj (ses kaydı)
+  FILE // dosya/belge (PDF vb.)
 }
 
 /// İlan üzerinden mesajlaşma
@@ -6024,6 +6032,15 @@ model ShMessage {
   kind     ShMessageKind @default(TEXT)
   imageUrl String? // IMAGE türü için Cloudinary görsel adresi
 
+  // VOICE türü için: ses kaydı adresi ve süresi
+  audioUrl      String?
+  audioDuration Int? // saniye
+
+  // FILE türü için: dosya adresi, adı ve boyutu
+  fileUrl  String?
+  fileName String?
+  fileSize Int? // byte
+
   // CALL türü için: arama sonucu ve süresi
   callOutcome  String? // "answered" | "missed" | "rejected" | "cancelled"
   callDuration Int? // saniye cinsinden konuşma süresi
@@ -6039,6 +6056,11 @@ model ShMessage {
 
   // Reaksiyonlar: [{ userId, emoji }]
   reactions Json?
+
+  // Sabitlenmiş mesaj (konuşma başında gösterilir)
+  pinnedAt      DateTime?
+  // İletilen mesaj — kaynak mesaj id'si
+  forwardedFrom String?
 
   createdAt DateTime @default(now())
 
@@ -6090,9 +6112,6 @@ model ShSavedSearch {
 // =====================================================================
 //  SAHIBINDEN — Kurumsal / Gelişmiş modüller
 // =====================================================================
-
-
-
 
 enum ShStoreType {
   INDIVIDUAL // Bireysel
@@ -6280,6 +6299,11 @@ model ShPayment {
   refId    String? // sağlayıcı işlem no (idempotency anahtarı)
   meta     Json?
 
+  // İade takibi (kısmi iade destekli)
+  refundedAmount Float     @default(0)
+  refundedAt     DateTime?
+  refundRef      String? // sağlayıcı iade işlem no
+
   // Tekrarlayan abonelik tahsilatıysa hangi aboneliğe ait
   subscriptionId String?
   subscription   ShSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
@@ -6394,10 +6418,16 @@ model ShReview {
   rating       Int // 1-5
   comment      String?
 
+  // Hangi rezervasyon/randevu sonrası bırakıldı (varsa)
+  bookingId     String?
+  appointmentId String?
+
   createdAt DateTime @default(now())
 
   @@index([targetUserId])
   @@index([storeId])
+  @@index([bookingId])
+  @@index([appointmentId])
   @@map("sh_reviews")
 }
 
@@ -6462,9 +6492,26 @@ model ShViewingAppointment {
   phone       String?
   status      ShAppointmentStatus @default(PENDING)
 
+  // Kiracının önerdiği alternatif/sıralı saatler: ["2026-07-01T10:00:00Z", ...]
+  // Ev sahibi onaylarken bunlardan birini seçebilir.
+  alternativeSlots Json?
+
+  // Randevu sonrası karşılıklı değerlendirme (1-5)
+  ratingByRequester Int?
+  ratingByOwner     Int?
+  reviewByRequester String?
+  reviewByOwner     String?
+
   // Görüntülü görüşme izleme
   callStartedAt DateTime?
   callEndedAt   DateTime?
+
+  // Yeniden planlama (karşı-teklif): bir taraf yeni saat önerir, diğeri kabul/ret eder.
+  proposedAt   DateTime?
+  proposedById String?
+
+  // Otomatik hatırlatma gönderildi mi (cron)
+  reminderSentAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6473,7 +6520,33 @@ model ShViewingAppointment {
   @@index([requesterId])
   @@index([ownerId])
   @@index([scheduledAt])
+  @@index([status, scheduledAt])
   @@map("sh_viewing_appointments")
+}
+
+/// İlan sahibinin haftalık randevu müsaitliği (Calendly tarzı slot üretimi için)
+model ShAvailability {
+  id           String @id @default(cuid()) @map("_id")
+  userId       String @unique
+  timezone     String @default("Europe/Istanbul")
+  slotMinutes  Int    @default(30) // her randevu/slot süresi (dk)
+  // Haftalık kurallar: [{ day: 0-6 (0=Pazar), start: "10:00", end: "18:00" }]
+  rules        Json   @default("[]")
+  // Tek seferlik kapalı günler: ["2026-07-01", ...]
+  blockedDates Json   @default("[]")
+  leadHours    Int    @default(2) // en erken kaç saat sonrasına randevu
+  maxDaysAhead Int    @default(30) // kaç gün ileriye kadar açık
+
+  // Otomatik onay: ilgili moddaki talepler ev sahibi onayı beklemeden CONFIRMED olur
+  autoConfirmVideo      Boolean @default(false)
+  autoConfirmFaceToFace Boolean @default(false)
+  // Günlük randevu kotası (0 = sınırsız)
+  maxPerDay             Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sh_availability")
 }
 
 enum ShDepositStatus {
@@ -6481,6 +6554,7 @@ enum ShDepositStatus {
   HELD // Ödendi / emanette
   RELEASED // Satıcıya aktarıldı
   REFUNDED // İade edildi
+  DISPUTED // Anlaşmazlık açıldı (admin çözecek)
   CANCELLED // İptal
 }
 
@@ -6546,6 +6620,12 @@ model ShDeposit {
   status    ShDepositStatus @default(PENDING)
   paymentId String?
   payment   ShPayment?      @relation(fields: [paymentId], references: [id])
+
+  // Anlaşmazlık / serbest bırakma izleme
+  disputeReason String?
+  disputedById  String?
+  releasedAt    DateTime?
+  refundedAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6760,6 +6840,17 @@ model ShRentalBooking {
   contactPhone String?
   cancelReason String?
 
+  // Tarih değişikliği önerisi (kiracı veya ev sahibi önerir, diğeri onaylar)
+  proposedStartDate   DateTime?
+  proposedEndDate     DateTime?
+  proposedById        String?
+  proposedTotalAmount Float?
+
+  // İade + değerlendirme izleme
+  refundedAmount Float   @default(0)
+  renterReviewed Boolean @default(false)
+  ownerReviewed  Boolean @default(false)
+
   paymentId String?
   payment   ShPayment? @relation(fields: [paymentId], references: [id])
   depositId String? // ShDeposit (güvenlik depozitosu emaneti)
@@ -6792,4 +6883,18 @@ model ShRentalBlock {
   @@index([listingId])
   @@index([listingId, startDate, endDate])
   @@map("sh_rental_blocks")
+}
+
+/// Web Push aboneliği (tarayıcı bildirimleri için). İlişkisiz — userId scalar.
+model ShPushSub {
+  id        String   @id @default(cuid()) @map("_id")
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  ua        String? // tarayıcı bilgisi (opsiyonel)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("sh_push_subs")
 }

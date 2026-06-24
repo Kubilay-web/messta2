@@ -160,7 +160,7 @@ export default function ListingSubscribeDialog({
                       </div>
                       <span className="shrink-0 text-right">
                         <span className="block font-bold text-yellow-600">{fmt(p.price, p.currency)}</span>
-                        <span className="text-[10px] text-gray-400">{perIntervalSuffix(p.interval, p.intervalCount)}</span>
+                        <span className="text-[10px] text-black">{perIntervalSuffix(p.interval, p.intervalCount)}</span>
                       </span>
                     </button>
                   ))}

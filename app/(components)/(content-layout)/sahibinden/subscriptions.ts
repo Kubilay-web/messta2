@@ -3,6 +3,7 @@ import prisma from "@/app/lib/prisma";
 import type { Prisma, ShPlan, ShSubscription } from "@prisma/client";
 import { addInterval, intervalLabel, type BillingInterval } from "./lib/billing";
 import { sendMail } from "./lib/mail";
+import { getPaypalSubscription } from "./lib/paypal";
 
 // ===========================================================================
 //  Abonelik motoru
@@ -67,6 +68,30 @@ export async function createPendingSubscription(
  * İlk başarılı tahsilatta aboneliği aktive eder, dönemi açar ve hakkı uygular.
  * provider* alanları (stripe sub id / paypal sub id) saklanır. Idempotent.
  */
+/**
+ * PayPal abonelik onayından DÖNÜŞTE çağrılır (webhook'tan bağımsız doğrulama):
+ * PayPal'dan aboneliğin durumunu çeker, ACTIVE/APPROVED ise yerel aboneliği
+ * aktive eder. Idempotent. `ppSubId` PayPal'ın dönüş URL'sine eklediği id'dir.
+ */
+export async function confirmPaypalSubscriptionReturn(ppSubId: string) {
+  const sub = await getPaypalSubscription(ppSubId);
+  if (!sub) return { ok: false as const, error: "PayPal aboneliği bulunamadı" };
+  const localId = sub.custom_id as string | undefined;
+  if (!localId) return { ok: false as const, error: "Yerel abonelik kimliği yok" };
+  const status = sub.status as string | undefined;
+  if (status !== "ACTIVE" && status !== "APPROVED") return { ok: false as const, status };
+
+  const periodEnd = sub.billing_info?.next_billing_time
+    ? new Date(sub.billing_info.next_billing_time)
+    : undefined;
+  return activateAndApply({
+    subscriptionId: localId,
+    provider: "paypal",
+    providerSubId: ppSubId,
+    periodEnd,
+  });
+}
+
 export async function activateAndApply(opts: {
   subscriptionId: string;
   provider: string;

@@ -265,6 +265,8 @@ export default async function ListingDetail({ params }: { params: Promise<{ id: 
               isOwner={isOwner}
               walletBalance={rentBalance}
               paypalEnabled={paypalEnabled}
+              cancellationPolicy={listing.cancellationPolicy}
+              houseRules={listing.houseRules}
             />
           )}
 

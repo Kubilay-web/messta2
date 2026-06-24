@@ -64,6 +64,9 @@ export interface ListingFormInput {
   maxNights?: number | null;
   maxGuests?: number | null;
   instantBook?: boolean;
+  cancellationPolicy?: string; // FLEXIBLE | MODERATE | STRICT
+  houseRules?: string | null;
+  checkInInstructions?: string | null;
 }
 
 export interface ActionResult<T = unknown> {

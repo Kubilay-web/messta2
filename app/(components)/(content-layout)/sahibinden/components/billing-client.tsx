@@ -263,7 +263,7 @@ function PlanCard({
         <span className="text-2xl font-extrabold text-gray-900">{fmt(plan.price, plan.currency)}</span>
         <span className="text-sm text-gray-500">{suffix}</span>
       </div>
-      <p className="mt-0.5 text-xs text-gray-400">{intervalLabel(plan.interval, plan.intervalCount)} yenilenir</p>
+      <p className="mt-0.5 text-xs text-black">{intervalLabel(plan.interval, plan.intervalCount)} yenilenir</p>
       {plan.trialDays > 0 && (
         <p className="mt-1 text-xs font-medium text-green-600">{plan.trialDays} gün ücretsiz deneme</p>
       )}

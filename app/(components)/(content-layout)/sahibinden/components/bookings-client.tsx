@@ -8,6 +8,9 @@ import {
   rejectBookingAction,
   cancelBookingAction,
   completeBookingAction,
+  proposeBookingChangeAction,
+  respondBookingChangeAction,
+  submitBookingReviewAction,
 } from "../booking-actions";
 
 export interface BookingVM {
@@ -26,6 +29,15 @@ export interface BookingVM {
   status: string;
   note: string | null;
   contactPhone: string | null;
+  // Tarih değişikliği önerisi
+  proposedStart?: string | null;
+  proposedEnd?: string | null;
+  proposedTotal?: number | null;
+  proposedByMe?: boolean;
+  // Değerlendirme
+  canReview?: boolean;
+  // Giriş talimatları (onaylı kiracıya)
+  checkInInstructions?: string | null;
 }
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -95,15 +107,27 @@ export default function BookingsClient({
 function BookingRow({ b, owner }: { b: BookingVM; owner: boolean }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
+  const [showModify, setShowModify] = useState(false);
+  const [mStart, setMStart] = useState(b.startDate.slice(0, 10));
+  const [mEnd, setMEnd] = useState(b.endDate.slice(0, 10));
+  const [showReview, setShowReview] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
   const router = useRouter();
   const st = STATUS[b.status] ?? { label: b.status, cls: "bg-gray-100 text-gray-600" };
+  const hasProposal = !!(b.proposedStart && b.proposedEnd);
+  const canModify = ["CONFIRMED", "AWAITING_APPROVAL"].includes(b.status) && !hasProposal;
+  const today = new Date().toISOString().slice(0, 10);
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     setErr("");
     start(async () => {
       const res = await fn();
-      if (res.ok) router.refresh();
-      else setErr(res.error ?? "Hata");
+      if (res.ok) {
+        setShowModify(false);
+        setShowReview(false);
+        router.refresh();
+      } else setErr(res.error ?? "Hata");
     });
   }
 
@@ -129,12 +153,93 @@ function BookingRow({ b, owner }: { b: BookingVM; owner: boolean }) {
           <p className="mt-0.5 text-xs text-gray-600">
             {owner ? "Kiracı" : "Ev sahibi"}: <span className="font-medium">{b.otherName}</span> ·{" "}
             <span className="font-semibold text-gray-800">{fmt(b.totalAmount, b.currency)}</span>
-            {b.deposit > 0 && <span className="text-gray-400"> (depozito {fmt(b.deposit, b.currency)})</span>}
+            {b.deposit > 0 && <span className="text-black"> (depozito {fmt(b.deposit, b.currency)})</span>}
           </p>
           {b.note && <p className="mt-1 rounded bg-gray-50 px-2 py-1 text-xs text-gray-600">“{b.note}”</p>}
           {owner && b.contactPhone && <p className="mt-1 text-xs text-gray-500">📞 {b.contactPhone}</p>}
+          {b.checkInInstructions && (
+            <p className="mt-1 rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
+              🔑 Giriş talimatları: {b.checkInInstructions}
+            </p>
+          )}
         </div>
       </div>
+
+      {/* Bekleyen tarih değişikliği önerisi */}
+      {hasProposal && (
+        <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          🕑 Önerilen yeni tarih: <b>{dateRange(b.proposedStart!, b.proposedEnd!)}</b>
+          {b.proposedTotal != null && <> · yeni tutar {fmt(b.proposedTotal, b.currency)}</>}
+          {b.proposedByMe ? (
+            <span className="ml-1 text-amber-600">(öneriniz onay bekliyor)</span>
+          ) : (
+            <span className="ml-2 inline-flex gap-2">
+              <button
+                disabled={pending}
+                onClick={() => run(() => respondBookingChangeAction(b.id, true))}
+                className="rounded bg-amber-600 px-2 py-0.5 font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                Kabul et
+              </button>
+              <button
+                disabled={pending}
+                onClick={() => run(() => respondBookingChangeAction(b.id, false))}
+                className="rounded border border-amber-300 px-2 py-0.5 font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+              >
+                Reddet
+              </button>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Tarih değiştir formu */}
+      {showModify && (
+        <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg bg-gray-50 p-2">
+          <label className="text-xs text-gray-600">
+            Giriş
+            <input type="date" min={today} value={mStart} onChange={(e) => setMStart(e.target.value)} className="ml-1 rounded border border-gray-200 px-2 py-1 text-xs" />
+          </label>
+          <label className="text-xs text-gray-600">
+            Çıkış
+            <input type="date" min={mStart} value={mEnd} onChange={(e) => setMEnd(e.target.value)} className="ml-1 rounded border border-gray-200 px-2 py-1 text-xs" />
+          </label>
+          <button
+            disabled={pending}
+            onClick={() => run(() => proposeBookingChangeAction(b.id, mStart, mEnd))}
+            className="rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-black disabled:opacity-50"
+          >
+            Öneriyi gönder
+          </button>
+        </div>
+      )}
+
+      {/* Değerlendirme formu */}
+      {showReview && (
+        <div className="mt-2 rounded-lg bg-gray-50 p-2">
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} onClick={() => setRating(n)} className={`text-lg ${n <= rating ? "text-yellow-400" : "text-gray-300"}`}>
+                ★
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={2}
+            placeholder="Deneyiminizi yazın (opsiyonel)"
+            className="mt-1 w-full rounded border border-gray-200 px-2 py-1 text-xs"
+          />
+          <button
+            disabled={pending}
+            onClick={() => run(() => submitBookingReviewAction(b.id, rating, comment))}
+            className="mt-1 rounded-lg bg-yellow-400 px-3 py-1.5 text-xs font-semibold text-gray-900 hover:bg-yellow-500 disabled:opacity-50"
+          >
+            Değerlendirmeyi gönder
+          </button>
+        </div>
+      )}
 
       {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
 
@@ -166,11 +271,29 @@ function BookingRow({ b, owner }: { b: BookingVM; owner: boolean }) {
             Konaklamayı Tamamla
           </button>
         )}
+        {canModify && (
+          <button
+            disabled={pending}
+            onClick={() => setShowModify((v) => !v)}
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            🕑 Tarihi değiştir
+          </button>
+        )}
+        {b.status === "COMPLETED" && b.canReview && (
+          <button
+            disabled={pending}
+            onClick={() => setShowReview((v) => !v)}
+            className="rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-1.5 text-xs font-semibold text-yellow-700 hover:bg-yellow-100 disabled:opacity-50"
+          >
+            ★ Değerlendir
+          </button>
+        )}
         {!owner && ["AWAITING_APPROVAL", "CONFIRMED", "PENDING"].includes(b.status) && (
           <button
             disabled={pending}
             onClick={() => {
-              if (confirm("Rezervasyonu iptal etmek istiyor musunuz? Ücret cüzdanınıza iade edilir.")) run(() => cancelBookingAction(b.id));
+              if (confirm("Rezervasyonu iptal etmek istiyor musunuz? İptal politikasına göre iade yapılır.")) run(() => cancelBookingAction(b.id));
             }}
             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
           >
